@@ -88,8 +88,9 @@
   }
 
   #printable-receipt {
-    position: fixed;
-    inset: 0;
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
     max-width: 80mm;
     margin: 0 auto;

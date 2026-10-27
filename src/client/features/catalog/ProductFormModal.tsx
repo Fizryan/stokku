@@ -136,8 +136,18 @@ export function ProductFormModal(props: ProductFormModalProps) {
       }
       maxWidthClass="max-w-2xl"
       onClose={props.onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={props.onClose} disabled={saving}>
+            Batal
+          </Button>
+          <Button type="submit" form="product-form" loading={saving}>
+            {isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} class="flex flex-col gap-4">
+      <form id="product-form" onSubmit={handleSubmit} class="flex flex-col gap-4">
         {errorMessage && (
           <div class="rounded-xl bg-m3-danger-container text-m3-on-danger-container px-3.5 py-2.5 text-xs font-medium">
             {errorMessage}
@@ -239,15 +249,6 @@ export function ProductFormModal(props: ProductFormModalProps) {
             onValueChange={(v) => setMinStockStr(String(parseDigitsToInt(v)))}
             helperText="Muncul peringatan saat stok mencapai angka ini."
           />
-        </div>
-
-        <div class="pt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={props.onClose} disabled={saving}>
-            Batal
-          </Button>
-          <Button type="submit" loading={saving}>
-            {isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
-          </Button>
         </div>
       </form>
     </Modal>

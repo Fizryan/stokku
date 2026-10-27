@@ -45,7 +45,7 @@ export function StockMovementModal(props: StockMovementModalProps) {
     setUpdateCostFlag(false)
     setNote('')
     setErrorMessage(null)
-  }, [props.open, props.preselectedProduct, props.products])
+  }, [props.open, props.preselectedProduct])
 
   const activeProducts = props.products.filter((p) => p.isActive)
   const selectedProduct =
@@ -68,6 +68,12 @@ export function StockMovementModal(props: StockMovementModalProps) {
     e.preventDefault()
     if (!selectedProduct) {
       setErrorMessage('Pilih produk terlebih dahulu.')
+      return
+    }
+    if (movementType !== 'IN_PURCHASE' && note.trim().length < 3) {
+      setErrorMessage(
+        'Alasan / catatan mutasi wajib diisi minimal 3 karakter untuk audit.',
+      )
       return
     }
     setErrorMessage(null)
@@ -119,8 +125,23 @@ export function StockMovementModal(props: StockMovementModalProps) {
       description="Setiap perubahan stok akan disimpan permanen di Kartu Stok (Audit Ledger)."
       maxWidthClass="max-w-lg"
       onClose={props.onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={props.onClose} disabled={saving}>
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form="stock-movement-form"
+            loading={saving}
+            disabled={!selectedProduct || projectedStock < 0}
+          >
+            Simpan Mutasi
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} class="flex flex-col gap-4">
+      <form id="stock-movement-form" onSubmit={handleSubmit} class="flex flex-col gap-4">
         {errorMessage && (
           <div class="rounded-xl bg-m3-danger-container text-m3-on-danger-container px-3.5 py-2.5 text-xs font-medium">
             {errorMessage}
@@ -257,19 +278,6 @@ export function StockMovementModal(props: StockMovementModalProps) {
             </span>
           </div>
         )}
-
-        <div class="pt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={props.onClose} disabled={saving}>
-            Batal
-          </Button>
-          <Button
-            type="submit"
-            loading={saving}
-            disabled={!selectedProduct || projectedStock < 0}
-          >
-            Simpan Mutasi
-          </Button>
-        </div>
       </form>
     </Modal>
   )

@@ -103,6 +103,14 @@ export function PosCartPanel(props: PosCartPanelProps) {
                       inputmode="numeric"
                       aria-label="Jumlah beli"
                       value={String(line.qty)}
+                      onBlur={(e) => {
+                        const parsed = parseDigitsToInt(
+                          (e.currentTarget as HTMLInputElement).value,
+                        )
+                        if (parsed <= 0) {
+                          updateLineQty(line.productId, 1)
+                        }
+                      }}
                       onInput={(e) => {
                         const parsed = parseDigitsToInt(
                           (e.currentTarget as HTMLInputElement).value,

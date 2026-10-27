@@ -17,7 +17,7 @@ import type {
   SaleDetailDTO,
   SaleSummaryDTO,
 } from '../../../shared/types.js'
-import { api, ClientApiError } from '../../api/client.js'
+import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge } from '../../components/ui/Badge.js'
 import { Button } from '../../components/ui/Button.js'
 import { Card } from '../../components/ui/Card.js'
@@ -33,7 +33,7 @@ import { ReceiptModal } from './ReceiptModal.js'
 import { VoidSaleModal } from './VoidSaleModal.js'
 
 export function SalesHistoryPage() {
-  const { can } = useAuth()
+  const { can, refreshSession } = useAuth()
   const { showToast } = useToast()
 
   const canVoid = can('sales:void')
@@ -75,13 +75,15 @@ export function SalesHistoryPage() {
         )
         setSalesData(res)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted || isAbortError(err)) return
         showToast(
           err instanceof ClientApiError ? err.message : 'Gagal memuat riwayat penjualan.',
           'error',
         )
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
       }
     },
     [search, statusFilter, paymentMethodFilter, dateFrom, dateTo, page, showToast],
@@ -121,6 +123,12 @@ export function SalesHistoryPage() {
 
       const response = await fetch(url, { credentials: 'same-origin' })
       if (!response.ok) {
+        if (response.status === 401) {
+          await refreshSession()
+          showToast('Sesi Anda telah berakhir. Silakan login kembali.', 'warning')
+          return
+        }
+
         let message = `Gagal mengunduh CSV (HTTP ${response.status}).`
         try {
           const body = (await response.json()) as {
@@ -193,6 +201,8 @@ export function SalesHistoryPage() {
             </span>
             <SearchInput
               placeholder="Cari nomor struk (INV-...) atau nama pelanggan..."
+              ariaLabel="Pencarian invoice atau nama pelanggan"
+              value={search}
               onDebouncedChange={(val) => {
                 setSearch(val)
                 setPage(1)

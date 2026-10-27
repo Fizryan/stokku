@@ -51,11 +51,22 @@ export class ClientApiError extends Error {
   }
 }
 
+export function isAbortError(err: unknown): boolean {
+  return (
+    (err instanceof DOMException || err instanceof Error) && err.name === 'AbortError'
+  )
+}
+
 type UnauthorizedListener = () => void
 let onUnauthorizedCallback: UnauthorizedListener | null = null
 
-export function registerUnauthorizedHandler(fn: UnauthorizedListener): void {
+export function registerUnauthorizedHandler(fn: UnauthorizedListener | null): () => void {
   onUnauthorizedCallback = fn
+  return () => {
+    if (onUnauthorizedCallback === fn) {
+      onUnauthorizedCallback = null
+    }
+  }
 }
 
 export const rpcClient = hc<AppType>('/')
@@ -68,7 +79,7 @@ async function unwrapApiResponse<T>(
   try {
     response = await responsePromise
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    if (isAbortError(err)) {
       throw err
     }
     throw new ClientApiError({

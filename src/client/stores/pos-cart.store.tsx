@@ -41,10 +41,46 @@ function loadPersistedDraft(): PersistedPosDraft {
       }
     }
     const parsed = JSON.parse(raw) as Partial<PersistedPosDraft>
+    const validatedLines: PosCartLine[] = []
+    if (Array.isArray(parsed.lines)) {
+      for (const line of parsed.lines) {
+        if (
+          line &&
+          typeof line.productId === 'number' &&
+          Number.isInteger(line.productId) &&
+          line.productId > 0 &&
+          typeof line.sku === 'string' &&
+          typeof line.name === 'string' &&
+          typeof line.unit === 'string' &&
+          typeof line.sellPrice === 'number' &&
+          Number.isFinite(line.sellPrice) &&
+          line.sellPrice >= 0 &&
+          typeof line.maxStockQty === 'number' &&
+          Number.isFinite(line.maxStockQty) &&
+          line.maxStockQty > 0 &&
+          typeof line.qty === 'number' &&
+          Number.isFinite(line.qty) &&
+          line.qty > 0
+        ) {
+          validatedLines.push({
+            productId: line.productId,
+            sku: line.sku,
+            name: line.name,
+            unit: line.unit,
+            sellPrice: Math.trunc(line.sellPrice),
+            maxStockQty: Math.trunc(line.maxStockQty),
+            qty: Math.min(Math.trunc(line.qty), Math.trunc(line.maxStockQty)),
+          })
+        }
+      }
+    }
+
     return {
-      lines: Array.isArray(parsed.lines) ? parsed.lines : [],
+      lines: validatedLines,
       discountAmount:
-        typeof parsed.discountAmount === 'number' && parsed.discountAmount >= 0
+        typeof parsed.discountAmount === 'number' &&
+        Number.isFinite(parsed.discountAmount) &&
+        parsed.discountAmount >= 0
           ? Math.trunc(parsed.discountAmount)
           : 0,
       paymentMethod:
@@ -305,6 +341,8 @@ export function PosCartProvider(props: { children: Child }) {
       syncProductStockSnapshot,
       removeLine,
       setDiscountAmount,
+      setPaymentMethod,
+      setCustomerName,
       clearCart,
     ],
   )

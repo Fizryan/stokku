@@ -124,16 +124,7 @@ export function UserFormModal(props: UserFormModalProps) {
           <Button variant="ghost" size="sm" disabled={submitting} onClick={props.onClose}>
             Batal
           </Button>
-          <Button
-            size="sm"
-            loading={submitting}
-            onClick={() => {
-              const form = document.getElementById(
-                'user-form-modal',
-              ) as HTMLFormElement | null
-              form?.requestSubmit()
-            }}
-          >
+          <Button type="submit" form="user-form-modal" size="sm" loading={submitting}>
             {isEdit ? 'Simpan Perubahan' : 'Buat Akun'}
           </Button>
         </>

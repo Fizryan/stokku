@@ -42,7 +42,18 @@ export function ToastProvider(props: { children: Child }) {
   const showToast = useCallback((title: string, variant: ToastVariant = 'info') => {
     idCounterRef.current += 1
     const id = idCounterRef.current
-    setToasts((prev) => [...prev.slice(-3), { id, title, variant }])
+
+    setToasts((prev) => {
+      const next = [...prev.slice(-3), { id, title, variant }]
+      const activeIds = new Set(next.map((t) => t.id))
+      for (const [timerId, timer] of timersRef.current.entries()) {
+        if (!activeIds.has(timerId) && timerId !== id) {
+          clearTimeout(timer)
+          timersRef.current.delete(timerId)
+        }
+      }
+      return next
+    })
 
     const timer = setTimeout(() => {
       timersRef.current.delete(id)

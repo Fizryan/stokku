@@ -45,11 +45,12 @@ export function AuthProvider(props: { children: Child }) {
   }, [])
 
   useEffect(() => {
-    registerUnauthorizedHandler(() => {
+    const unregister = registerUnauthorizedHandler(() => {
       setUser(null)
       showToast('Sesi Anda telah berakhir. Silakan login kembali.', 'warning')
     })
     void refreshSession()
+    return unregister
   }, [refreshSession, showToast])
 
   const completeInitialSetup = useCallback(async (input: InitialSetupInput) => {

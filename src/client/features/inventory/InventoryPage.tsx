@@ -14,7 +14,7 @@ import type {
   ProductDTO,
   StockMovementDTO,
 } from '../../../shared/types.js'
-import { api, ClientApiError } from '../../api/client.js'
+import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge, type BadgeTone } from '../../components/ui/Badge.js'
 import { Button } from '../../components/ui/Button.js'
 import { Card } from '../../components/ui/Card.js'
@@ -79,7 +79,7 @@ export function InventoryPage() {
         )
         setMovementsData(res)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted || isAbortError(err)) return
         showToast(
           err instanceof ClientApiError
             ? err.message
@@ -87,7 +87,9 @@ export function InventoryPage() {
           'error',
         )
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
       }
     },
     [productIdFilter, typeFilter, dateFrom, dateTo, page, showToast],
