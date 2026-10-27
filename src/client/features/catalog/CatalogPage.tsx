@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'hono/jsx/dom'
 import { formatInteger, formatRupiah } from '../../../shared/formatters.js'
 import type { CategoryDTO, PaginatedResult, ProductDTO } from '../../../shared/types.js'
-import { api, ClientApiError } from '../../api/client.js'
+import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge } from '../../components/ui/Badge.js'
 import { Button } from '../../components/ui/Button.js'
 import { Card } from '../../components/ui/Card.js'
@@ -76,13 +76,15 @@ export function CatalogPage() {
         )
         setProductsData(result)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted || isAbortError(err)) return
         showToast(
           err instanceof ClientApiError ? err.message : 'Gagal memuat katalog produk.',
           'error',
         )
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
       }
     },
     [search, categoryIdFilter, statusFilter, lowStockOnly, page, showToast],
@@ -138,6 +140,8 @@ export function CatalogPage() {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
           <SearchInput
             placeholder="Cari nama produk, SKU, atau barcode..."
+            ariaLabel="Pencarian katalog produk"
+            value={search}
             onDebouncedChange={(val) => {
               setSearch(val)
               setPage(1)

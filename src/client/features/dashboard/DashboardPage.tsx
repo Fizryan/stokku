@@ -6,7 +6,7 @@ import {
   formatRupiah,
 } from '../../../shared/formatters.js'
 import type { DashboardMetricsDTO } from '../../../shared/types.js'
-import { api, ClientApiError } from '../../api/client.js'
+import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge } from '../../components/ui/Badge.js'
 import { Button } from '../../components/ui/Button.js'
 import { Card } from '../../components/ui/Card.js'
@@ -40,7 +40,7 @@ export function DashboardPage() {
         const data = await api.dashboard.getMetrics(selectedDays, signal)
         setMetrics(data)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted || isAbortError(err)) return
         showToast(
           err instanceof ClientApiError
             ? err.message
@@ -48,7 +48,9 @@ export function DashboardPage() {
           'error',
         )
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
       }
     },
     [showToast],

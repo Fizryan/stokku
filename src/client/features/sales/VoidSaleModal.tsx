@@ -80,15 +80,11 @@ export function VoidSaleModal(props: VoidSaleModalProps) {
             Batal
           </Button>
           <Button
+            type="submit"
+            form="void-sale-form"
             variant="danger"
             size="sm"
             loading={submitting}
-            onClick={() => {
-              const form = document.getElementById(
-                'void-sale-form',
-              ) as HTMLFormElement | null
-              form?.requestSubmit()
-            }}
           >
             Konfirmasi Void
           </Button>

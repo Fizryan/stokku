@@ -62,8 +62,18 @@ export function ChangePasswordModal(props: ChangePasswordModalProps) {
       title="Ubah Password Akun"
       description="Sesi aktif di perangkat lain akan otomatis dikeluarkan demi keamanan."
       onClose={resetAndClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={resetAndClose} disabled={submitting}>
+            Batal
+          </Button>
+          <Button type="submit" form="change-password-form" loading={submitting}>
+            Simpan Password
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} class="flex flex-col gap-4">
+      <form id="change-password-form" onSubmit={handleSubmit} class="flex flex-col gap-4">
         {errorMessage && (
           <div class="rounded-xl bg-m3-danger-container text-m3-on-danger-container px-3.5 py-2.5 text-xs font-medium">
             {errorMessage}
@@ -97,15 +107,6 @@ export function ChangePasswordModal(props: ChangePasswordModalProps) {
           autoComplete="new-password"
           required
         />
-
-        <div class="pt-2 flex justify-end gap-2">
-          <Button variant="ghost" onClick={resetAndClose} disabled={submitting}>
-            Batal
-          </Button>
-          <Button type="submit" loading={submitting}>
-            Simpan Password
-          </Button>
-        </div>
       </form>
     </Modal>
   )

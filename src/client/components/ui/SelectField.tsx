@@ -18,6 +18,7 @@ export interface SelectFieldProps {
 
 export function SelectField(props: SelectFieldProps) {
   const selectId = useId()
+  const errorId = `${selectId}-error`
   const hasError = Boolean(props.errorText)
 
   return (
@@ -37,6 +38,8 @@ export function SelectField(props: SelectFieldProps) {
         value={props.value}
         disabled={props.disabled}
         required={props.required}
+        aria-invalid={hasError}
+        aria-describedby={hasError ? errorId : undefined}
         onChange={(e) => {
           const target = e.currentTarget as HTMLSelectElement
           props.onValueChange(target.value)
@@ -55,7 +58,11 @@ export function SelectField(props: SelectFieldProps) {
         ))}
       </select>
 
-      {props.errorText && <p class="text-xs text-m3-danger">{props.errorText}</p>}
+      {props.errorText && (
+        <p id={errorId} class="text-xs text-m3-danger">
+          {props.errorText}
+        </p>
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { IconClose, IconSearch } from './Icons.js'
 
 export interface SearchInputProps {
   readonly placeholder: string
+  readonly ariaLabel?: string
   readonly value?: string
   readonly debounceMs?: number
   readonly onDebouncedChange: (value: string) => void
@@ -58,6 +59,7 @@ export function SearchInput(props: SearchInputProps) {
         type="search"
         value={localValue}
         placeholder={props.placeholder}
+        aria-label={props.ariaLabel ?? props.placeholder}
         onInput={(e) => {
           const next = (e.currentTarget as HTMLInputElement).value
           setLocalValue(next)

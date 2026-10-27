@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'hono/jsx/dom'
 import { formatInteger, formatRupiah } from '../../../shared/formatters.js'
 import type { CategoryDTO, ProductDTO, SaleDetailDTO } from '../../../shared/types.js'
-import { api, ClientApiError } from '../../api/client.js'
+import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge } from '../../components/ui/Badge.js'
 import { BottomSheet } from '../../components/ui/BottomSheet.js'
 import { Card } from '../../components/ui/Card.js'
@@ -60,7 +60,7 @@ export function PosPage() {
         setProducts(res.items)
         syncProductStockSnapshot(res.items)
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if (signal?.aborted || isAbortError(err)) return
         showToast(
           err instanceof ClientApiError
             ? err.message
@@ -68,7 +68,9 @@ export function PosPage() {
           'error',
         )
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
       }
     },
     [search, selectedCategoryId, syncProductStockSnapshot, showToast],
@@ -124,6 +126,8 @@ export function PosPage() {
         <Card class="p-4 flex flex-col gap-3">
           <SearchInput
             placeholder="Scan barcode + tekan Enter, atau ketik nama produk..."
+            ariaLabel="Pencarian barcode atau produk kasir"
+            value={search}
             onDebouncedChange={setSearch}
             onEnterSubmit={(code, clear) => {
               void handleBarcodeEnter(code, clear)

@@ -19,7 +19,10 @@ export interface TextFieldProps {
 
 export function TextField(props: TextFieldProps) {
   const inputId = useId()
+  const errorId = `${inputId}-error`
+  const helperId = `${inputId}-helper`
   const hasError = Boolean(props.errorText)
+  const descriptionId = hasError ? errorId : props.helperText ? helperId : undefined
 
   return (
     <div class={['flex flex-col gap-1.5', props.class ?? ''].join(' ').trim()}>
@@ -38,6 +41,8 @@ export function TextField(props: TextFieldProps) {
         placeholder={props.placeholder}
         required={props.required}
         disabled={props.disabled}
+        aria-invalid={hasError}
+        aria-describedby={descriptionId}
         autocomplete={props.autoComplete}
         inputmode={props.inputMode}
         maxlength={props.maxLength}
@@ -55,9 +60,13 @@ export function TextField(props: TextFieldProps) {
       />
 
       {props.errorText ? (
-        <p class="text-xs text-m3-danger">{props.errorText}</p>
+        <p id={errorId} class="text-xs text-m3-danger">
+          {props.errorText}
+        </p>
       ) : props.helperText ? (
-        <p class="text-xs text-m3-on-surface-variant">{props.helperText}</p>
+        <p id={helperId} class="text-xs text-m3-on-surface-variant">
+          {props.helperText}
+        </p>
       ) : null}
     </div>
   )

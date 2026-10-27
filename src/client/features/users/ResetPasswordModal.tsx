@@ -74,14 +74,10 @@ export function ResetPasswordModal(props: ResetPasswordModalProps) {
             Batal
           </Button>
           <Button
+            type="submit"
+            form="reset-user-password-form"
             size="sm"
             loading={submitting}
-            onClick={() => {
-              const form = document.getElementById(
-                'reset-user-password-form',
-              ) as HTMLFormElement | null
-              form?.requestSubmit()
-            }}
           >
             Simpan Password Baru
           </Button>

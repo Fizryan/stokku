@@ -8,6 +8,7 @@ export interface ButtonProps {
   readonly variant?: ButtonVariant
   readonly size?: ButtonSize
   readonly type?: 'button' | 'submit' | 'reset'
+  readonly form?: string
   readonly disabled?: boolean
   readonly loading?: boolean
   readonly fullWidth?: boolean
@@ -41,6 +42,7 @@ export function Button(props: ButtonProps) {
   return (
     <button
       type={props.type ?? 'button'}
+      form={props.form}
       disabled={isDisabled}
       title={props.title}
       onClick={props.onClick}
