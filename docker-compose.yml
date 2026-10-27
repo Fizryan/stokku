@@ -1,0 +1,23 @@
+services:
+  stokku:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stokku-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /data/stokku.sqlite
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    volumes:
+      - stokku_data:/data
+
+volumes:
+  stokku_data:
+    name: stokku_sqlite_data

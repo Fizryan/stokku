@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx/dom",
+    "noEmit": true
+  },
+  "include": [
+    "src/shared/**/*.ts",
+    "src/server/routes/**/*.ts",
+    "src/server/contracts/**/*.ts",
+    "src/server/middlewares/**/*.ts",
+    "src/server/errors/**/*.ts",
+    "src/client/**/*.ts",
+    "src/client/**/*.tsx"
+  ]
+}

@@ -2,18 +2,30 @@
 .yarn/
 !.yarn/releases
 .vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/*.code-snippets
 .idea/workspace.xml
 .idea/usage.statistics.xml
 .idea/shelf
 
-# deps
+# deps & build
 node_modules/
+dist/
+*.tsbuildinfo
+
+# sqlite database & local data
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
 
 # env
 .env
-.env.production
+.env.*
+!.env.example
 
 # logs
 logs/

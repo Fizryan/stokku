@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    "Inter", "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Material 3 Calm Sapphire Blue Palette */
+  --color-m3-primary: #1a5fb4;
+  --color-m3-primary-hover: #154f96;
+  --color-m3-on-primary: #ffffff;
+  --color-m3-primary-container: #d8e6ff;
+  --color-m3-on-primary-container: #001b3d;
+
+  --color-m3-secondary: #4e5f78;
+  --color-m3-on-secondary: #ffffff;
+  --color-m3-secondary-container: #d6e4f7;
+  --color-m3-on-secondary-container: #0b1d33;
+
+  /* Tonal Surface Hierarchy (Modern Calm Philosophy) */
+  --color-m3-surface: #f7f9fc;
+  --color-m3-surface-container-lowest: #ffffff;
+  --color-m3-surface-container-low: #f1f5fa;
+  --color-m3-surface-container: #eaeff7;
+  --color-m3-surface-container-high: #e1e8f2;
+  --color-m3-surface-container-highest: #d8e1ee;
+
+  --color-m3-on-surface: #161c24;
+  --color-m3-on-surface-variant: #4a5565;
+  --color-m3-outline: #748094;
+  --color-m3-outline-variant: #d3dde9;
+
+  /* Semantic Status Tones */
+  --color-m3-success: #157347;
+  --color-m3-success-container: #dcf4e7;
+  --color-m3-on-success-container: #083b22;
+
+  --color-m3-warning: #9a5b00;
+  --color-m3-warning-container: #fef0d6;
+  --color-m3-on-warning-container: #472800;
+
+  --color-m3-danger: #ba1a1a;
+  --color-m3-danger-hover: #9c1515;
+  --color-m3-on-danger: #ffffff;
+  --color-m3-danger-container: #ffdad6;
+  --color-m3-on-danger-container: #410002;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Calm, subtle custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-m3-outline-variant);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-m3-outline);
+  }
+}
+
+/* Dedicated print layout for POS thermal/A4 receipt (unlayered overrides Tailwind @layer) */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #printable-receipt {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 80mm;
+    margin: 0 auto;
+    padding: 8px;
+    background: #ffffff;
+    color: #000000;
+    box-shadow: none;
+    border: none;
+  }
+}

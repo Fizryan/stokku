@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": [
+    "src/shared/**/*.ts",
+    "src/server/**/*.ts",
+    "tests/**/*.ts",
+    "vite.config.ts"
+  ]
+}
