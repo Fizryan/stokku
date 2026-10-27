@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { hasPermission } from '../../shared/constants.js'
+import { hasPermission, LOYALTY_RULES } from '../../shared/constants.js'
 import type {
   CheckoutSaleInput,
   SalesQueryInput,
@@ -11,11 +11,16 @@ import type {
   SaleSummaryDTO,
   UserDTO,
 } from '../../shared/types.js'
-import type { PosServiceContract } from '../contracts/services.contract.js'
+import type {
+  AuditServiceContract,
+  PosServiceContract,
+} from '../contracts/services.contract.js'
 import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
+import type { CustomerRepository } from '../repositories/customer.repo.js'
 import type { ProductRepository } from '../repositories/product.repo.js'
 import type { SaleRepository } from '../repositories/sale.repo.js'
+import type { ShiftRepository } from '../repositories/shift.repo.js'
 import type { InventoryService } from './inventory.service.js'
 
 export interface PosServiceDeps {
@@ -23,6 +28,9 @@ export interface PosServiceDeps {
   readonly productRepo: ProductRepository
   readonly saleRepo: SaleRepository
   readonly inventoryService: InventoryService
+  readonly shiftRepo: ShiftRepository
+  readonly customerRepo?: CustomerRepository
+  readonly auditService?: AuditServiceContract
 }
 
 export class PosService implements PosServiceContract {
@@ -37,6 +45,13 @@ export class PosService implements PosServiceContract {
   }
 
   public checkout(actor: UserDTO, input: CheckoutSaleInput): SaleDetailDTO {
+    const activeShift = this.deps.shiftRepo.findActiveByCashierId(actor.id)
+    if (!activeShift) {
+      throw AppError.badRequest(
+        'Kasir wajib membuka shift terlebih dahulu sebelum memproses transaksi penjualan POS.',
+      )
+    }
+
     const qtyByProductId = new Map<number, number>()
     for (const item of input.items) {
       qtyByProductId.set(
@@ -99,14 +114,49 @@ export class PosService implements PosServiceContract {
         })
       }
 
-      if (input.discountAmount > subtotalAmount) {
+      // Customer and Loyalty Points Resolution
+      let customerId: number | null = null
+      let resolvedCustomerName: string | null = input.customerName ?? null
+      let pointsRedeemed = 0
+      let pointsDiscountAmount = 0
+
+      if (input.customerId && this.deps.customerRepo) {
+        const customer = this.deps.customerRepo.findById(input.customerId)
+        if (!customer) {
+          throw AppError.notFound(
+            `Pelanggan dengan ID #${input.customerId} tidak ditemukan.`,
+          )
+        }
+        if (!customer.isActive) {
+          throw AppError.badRequest(
+            `Akun pelanggan "${customer.name}" sedang tidak aktif.`,
+          )
+        }
+
+        customerId = customer.id
+        resolvedCustomerName = customer.name
+
+        if (input.pointsRedeemed > 0) {
+          if (input.pointsRedeemed > customer.pointsBalance) {
+            throw AppError.badRequest(
+              `Poin yang ditukarkan (${input.pointsRedeemed} poin) melebihi saldo pelanggan (${customer.pointsBalance} poin).`,
+            )
+          }
+          pointsRedeemed = input.pointsRedeemed
+          pointsDiscountAmount = pointsRedeemed * LOYALTY_RULES.POINT_VALUE_IN_RUPIAH
+        }
+      }
+
+      const totalDiscount = input.discountAmount + pointsDiscountAmount
+
+      if (totalDiscount > subtotalAmount) {
         throw AppError.validation(
-          'Nominal diskon tidak boleh melebihi subtotal belanja.',
-          [{ path: 'discountAmount', message: 'Diskon melebihi subtotal.' }],
+          'Total diskon (termasuk diskon poin reward) tidak boleh melebihi subtotal belanja.',
+          [{ path: 'discountAmount', message: 'Diskon melebihi subtotal belanja.' }],
         )
       }
 
-      const totalAmount = subtotalAmount - input.discountAmount
+      const totalAmount = subtotalAmount - totalDiscount
       if (input.paidAmount < totalAmount) {
         throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
           {
@@ -126,12 +176,22 @@ export class PosService implements PosServiceContract {
       const changeAmount = input.paidAmount - totalAmount
       const invoiceNumber = this.deps.saleRepo.generateNextInvoiceNumber(now)
 
+      // Calculate earned points from net total amount
+      const pointsEarned = customerId
+        ? Math.floor(totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
+        : 0
+
       const saleId = this.deps.saleRepo.createSaleRecord({
+        shiftId: activeShift.id,
         invoiceNumber,
         cashierUserId: actor.id,
-        customerName: input.customerName,
+        customerId,
+        customerName: resolvedCustomerName,
+        pointsEarned,
+        pointsRedeemed,
+        pointsDiscountAmount,
         subtotalAmount,
-        discountAmount: input.discountAmount,
+        discountAmount: totalDiscount,
         totalAmount,
         paymentMethod: input.paymentMethod,
         paidAmount: input.paidAmount,
@@ -140,6 +200,7 @@ export class PosService implements PosServiceContract {
         items: resolvedItems,
       })
 
+      // Deduct inventory stock for each sale item
       for (const productId of sortedProductIds) {
         const product = productsMap.get(productId)
         const qty = qtyByProductId.get(productId)
@@ -158,6 +219,42 @@ export class PosService implements PosServiceContract {
         })
       }
 
+      // Mutate customer loyalty balance and audit log
+      if (customerId && this.deps.customerRepo) {
+        const netPointsDelta = pointsEarned - pointsRedeemed
+        this.deps.customerRepo.incrementSpendAndVisitInTx(
+          customerId,
+          totalAmount,
+          netPointsDelta,
+        )
+
+        if (pointsRedeemed > 0) {
+          this.deps.customerRepo.recordPointMutationInTx({
+            customerId,
+            points: -pointsRedeemed,
+            mutationType: 'REDEEMED',
+            referenceType: 'SALE',
+            referenceId: saleId,
+            description: `Tukar ${pointsRedeemed} poin (Diskon Rp ${pointsDiscountAmount.toLocaleString('id-ID')}) — ${invoiceNumber}`,
+            actorUserId: actor.id,
+            nowIso,
+          })
+        }
+
+        if (pointsEarned > 0) {
+          this.deps.customerRepo.recordPointMutationInTx({
+            customerId,
+            points: pointsEarned,
+            mutationType: 'EARNED',
+            referenceType: 'SALE',
+            referenceId: saleId,
+            description: `Perolehan poin belanja — ${invoiceNumber}`,
+            actorUserId: actor.id,
+            nowIso,
+          })
+        }
+      }
+
       const detail = this.deps.saleRepo.findDetailById(saleId, includeFinancials)
       if (!detail) {
         throw new Error('Failed to load newly created sale receipt.')
@@ -170,10 +267,14 @@ export class PosService implements PosServiceContract {
     actor: UserDTO,
     query: SalesQueryInput,
   ): PaginatedResult<SaleSummaryDTO> {
-    const canViewAll = hasPermission(actor.role, 'sales:view_all')
+    const includeFinancials = this.canSeeFinancials(actor)
+    const restrictToCashierId = hasPermission(actor.role, 'sales:view_all')
+      ? undefined
+      : actor.id
+
     return this.deps.saleRepo.listPaginated(query, {
-      includeFinancials: this.canSeeFinancials(actor),
-      restrictToCashierId: canViewAll ? undefined : actor.id,
+      includeFinancials,
+      restrictToCashierId,
     })
   }
 
@@ -249,6 +350,42 @@ export class PosService implements PosServiceContract {
         })
       }
 
+      // Revert customer loyalty points & spend metrics
+      if (existing.customerId && this.deps.customerRepo) {
+        const netPointsReversal = existing.pointsRedeemed - existing.pointsEarned
+        this.deps.customerRepo.decrementSpendAndVisitInTx(
+          existing.customerId,
+          existing.totalAmount,
+          netPointsReversal,
+        )
+
+        if (existing.pointsRedeemed > 0) {
+          this.deps.customerRepo.recordPointMutationInTx({
+            customerId: existing.customerId,
+            points: existing.pointsRedeemed,
+            mutationType: 'VOID_RESTORED',
+            referenceType: 'SALE',
+            referenceId: saleId,
+            description: `Pengembalian ${existing.pointsRedeemed} poin void transaksi — ${existing.invoiceNumber}`,
+            actorUserId: actor.id,
+            nowIso,
+          })
+        }
+
+        if (existing.pointsEarned > 0) {
+          this.deps.customerRepo.recordPointMutationInTx({
+            customerId: existing.customerId,
+            points: -existing.pointsEarned,
+            mutationType: 'VOID_REVERSED',
+            referenceType: 'SALE',
+            referenceId: saleId,
+            description: `Penarikan ${existing.pointsEarned} poin void transaksi — ${existing.invoiceNumber}`,
+            actorUserId: actor.id,
+            nowIso,
+          })
+        }
+      }
+
       const updated = this.deps.saleRepo.findDetailById(
         saleId,
         this.canSeeFinancials(actor),
@@ -256,6 +393,22 @@ export class PosService implements PosServiceContract {
       if (!updated) {
         throw new Error('Failed to load voided sale detail.')
       }
+
+      if (this.deps.auditService) {
+        this.deps.auditService.log({
+          actor,
+          actionType: 'SALE_VOIDED',
+          resourceType: 'sale',
+          resourceId: saleId,
+          details: {
+            invoiceNumber: existing.invoiceNumber,
+            reason: input.reason,
+            totalAmount: existing.totalAmount,
+            cashierName: existing.cashierName,
+          },
+        })
+      }
+
       return updated
     })
   }

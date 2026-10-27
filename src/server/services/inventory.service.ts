@@ -5,7 +5,10 @@ import type {
   RecordStockMovementInput,
 } from '../../shared/schemas/index.js'
 import type { PaginatedResult, StockMovementDTO, UserDTO } from '../../shared/types.js'
-import type { InventoryServiceContract } from '../contracts/services.contract.js'
+import type {
+  AuditServiceContract,
+  InventoryServiceContract,
+} from '../contracts/services.contract.js'
 import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
 import type { ProductRecord, ProductRepository } from '../repositories/product.repo.js'
@@ -15,6 +18,7 @@ export interface InventoryServiceDeps {
   readonly db: DatabaseSync
   readonly productRepo: ProductRepository
   readonly stockMovementRepo: StockMovementRepository
+  readonly auditService?: AuditServiceContract
 }
 
 export class InventoryService implements InventoryServiceContract {
@@ -130,7 +134,7 @@ export class InventoryService implements InventoryServiceContract {
     const nowIso = new Date().toISOString()
     const includeCost = this.canSeeCost(actor)
 
-    return runInImmediateTransaction(this.deps.db, () => {
+    const movement = runInImmediateTransaction(this.deps.db, () => {
       const product = this.deps.productRepo.findById(input.productId)
       if (!product) {
         throw AppError.notFound('Produk tidak ditemukan.')
@@ -224,6 +228,27 @@ export class InventoryService implements InventoryServiceContract {
         includeUnitCostInResult: includeCost,
       })
     })
+
+    if (this.deps.auditService) {
+      this.deps.auditService.log({
+        actor,
+        actionType: 'STOCK_ADJUSTED',
+        resourceType: 'product',
+        resourceId: movement.productId,
+        details: {
+          productId: movement.productId,
+          sku: movement.productSku,
+          name: movement.productName,
+          movementType: movement.movementType,
+          qtyBefore: movement.qtyBefore,
+          qtyChange: movement.qtyChange,
+          qtyAfter: movement.qtyAfter,
+          note: movement.note,
+        },
+      })
+    }
+
+    return movement
   }
 
   public listMovements(

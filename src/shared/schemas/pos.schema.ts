@@ -27,7 +27,20 @@ export const checkoutSaleSchema = z.object({
     error: 'Metode pembayaran tidak valid.',
   }),
   paidAmount: nonNegativeMoneySchema('Jumlah bayar'),
+  customerId: z
+    .number({ error: 'ID pelanggan tidak valid.' })
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .default(null),
   customerName: trimmedNullableString(80),
+  pointsRedeemed: z
+    .number({ error: 'Poin yang ditukarkan harus berupa angka bulat.' })
+    .int('Poin harus berupa bilangan bulat.')
+    .min(0, 'Poin tidak boleh negatif.')
+    .max(1_000_000, 'Poin melebihi batas maksimum penukaran.')
+    .default(0),
 })
 
 export const voidSaleSchema = z.object({

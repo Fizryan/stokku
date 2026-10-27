@@ -7,8 +7,8 @@ import {
   useMemo,
   useState,
 } from 'hono/jsx/dom'
-import type { PaymentMethod } from '../../shared/constants.js'
-import type { ProductDTO } from '../../shared/types.js'
+import { LOYALTY_RULES, type PaymentMethod } from '../../shared/constants.js'
+import type { CustomerDTO, ProductDTO } from '../../shared/types.js'
 
 export interface PosCartLine {
   readonly productId: number
@@ -109,6 +109,9 @@ interface PosCartContextValue {
   readonly discountAmount: number
   readonly paymentMethod: PaymentMethod
   readonly customerName: string
+  readonly selectedCustomer: CustomerDTO | null
+  readonly pointsRedeemed: number
+  readonly pointsDiscountAmount: number
   readonly totalItemsCount: number
   readonly subtotalAmount: number
   readonly effectiveDiscountAmount: number
@@ -120,6 +123,8 @@ interface PosCartContextValue {
   readonly setDiscountAmount: (amount: number) => void
   readonly setPaymentMethod: (method: PaymentMethod) => void
   readonly setCustomerName: (name: string) => void
+  readonly setSelectedCustomer: (customer: CustomerDTO | null) => void
+  readonly setPointsRedeemed: (points: number) => void
   readonly clearCart: () => void
 }
 
@@ -133,6 +138,8 @@ export function PosCartProvider(props: { children: Child }) {
   )
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(initial.paymentMethod)
   const [customerName, setCustomerName] = useState<string>(initial.customerName)
+  const [selectedCustomer, setSelectedCustomerState] = useState<CustomerDTO | null>(null)
+  const [pointsRedeemed, setPointsRedeemedState] = useState<number>(0)
 
   useEffect(() => {
     try {
@@ -284,29 +291,58 @@ export function PosCartProvider(props: { children: Child }) {
     setDiscountAmountState(Math.max(0, Math.trunc(amount)))
   }, [])
 
+  const setSelectedCustomer = useCallback(
+    (customer: CustomerDTO | null) => {
+      setSelectedCustomerState(customer)
+      if (!customer) {
+        setPointsRedeemedState(0)
+      } else if (pointsRedeemed > customer.pointsBalance) {
+        setPointsRedeemedState(customer.pointsBalance)
+      }
+    },
+    [pointsRedeemed],
+  )
+
+  const setPointsRedeemed = useCallback(
+    (pts: number) => {
+      const maxPts = selectedCustomer ? selectedCustomer.pointsBalance : 0
+      setPointsRedeemedState(Math.max(0, Math.min(Math.trunc(pts), maxPts)))
+    },
+    [selectedCustomer],
+  )
+
   const clearCart = useCallback(() => {
     setLines([])
     setDiscountAmountState(0)
     setPaymentMethod('CASH')
     setCustomerName('')
+    setSelectedCustomerState(null)
+    setPointsRedeemedState(0)
   }, [])
 
-  const { totalItemsCount, subtotalAmount, effectiveDiscountAmount, grandTotalAmount } =
-    useMemo(() => {
-      let count = 0
-      let sub = 0
-      for (const line of lines) {
-        count += line.qty
-        sub += line.sellPrice * line.qty
-      }
-      const effDisc = Math.min(discountAmount, sub)
-      return {
-        totalItemsCount: count,
-        subtotalAmount: sub,
-        effectiveDiscountAmount: effDisc,
-        grandTotalAmount: sub - effDisc,
-      }
-    }, [lines, discountAmount])
+  const {
+    totalItemsCount,
+    subtotalAmount,
+    pointsDiscountAmount,
+    effectiveDiscountAmount,
+    grandTotalAmount,
+  } = useMemo(() => {
+    let count = 0
+    let sub = 0
+    for (const line of lines) {
+      count += line.qty
+      sub += line.sellPrice * line.qty
+    }
+    const ptsDisc = pointsRedeemed * LOYALTY_RULES.POINT_VALUE_IN_RUPIAH
+    const effDisc = Math.min(discountAmount + ptsDisc, sub)
+    return {
+      totalItemsCount: count,
+      subtotalAmount: sub,
+      pointsDiscountAmount: ptsDisc,
+      effectiveDiscountAmount: effDisc,
+      grandTotalAmount: sub - effDisc,
+    }
+  }, [lines, discountAmount, pointsRedeemed])
 
   const value = useMemo<PosCartContextValue>(
     () => ({
@@ -314,6 +350,9 @@ export function PosCartProvider(props: { children: Child }) {
       discountAmount,
       paymentMethod,
       customerName,
+      selectedCustomer,
+      pointsRedeemed,
+      pointsDiscountAmount,
       totalItemsCount,
       subtotalAmount,
       effectiveDiscountAmount,
@@ -325,6 +364,8 @@ export function PosCartProvider(props: { children: Child }) {
       setDiscountAmount,
       setPaymentMethod,
       setCustomerName,
+      setSelectedCustomer,
+      setPointsRedeemed,
       clearCart,
     }),
     [
@@ -332,6 +373,9 @@ export function PosCartProvider(props: { children: Child }) {
       discountAmount,
       paymentMethod,
       customerName,
+      selectedCustomer,
+      pointsRedeemed,
+      pointsDiscountAmount,
       totalItemsCount,
       subtotalAmount,
       effectiveDiscountAmount,
@@ -343,6 +387,8 @@ export function PosCartProvider(props: { children: Child }) {
       setDiscountAmount,
       setPaymentMethod,
       setCustomerName,
+      setSelectedCustomer,
+      setPointsRedeemed,
       clearCart,
     ],
   )

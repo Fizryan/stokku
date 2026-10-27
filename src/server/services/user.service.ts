@@ -5,7 +5,10 @@ import type {
   UpdateUserInput,
 } from '../../shared/schemas/index.js'
 import type { UserDTO } from '../../shared/types.js'
-import type { UserServiceContract } from '../contracts/services.contract.js'
+import type {
+  AuditServiceContract,
+  UserServiceContract,
+} from '../contracts/services.contract.js'
 import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
 import type { SessionRepository } from '../repositories/session.repo.js'
@@ -16,6 +19,7 @@ export interface UserServiceDeps {
   readonly db: DatabaseSync
   readonly userRepo: UserRepository
   readonly sessionRepo: SessionRepository
+  readonly auditService?: AuditServiceContract
 }
 
 export class UserService implements UserServiceContract {
@@ -29,17 +33,33 @@ export class UserService implements UserServiceContract {
     return this.deps.userRepo.listAll()
   }
 
-  public async createUser(input: CreateUserInput): Promise<UserDTO> {
+  public async createUser(input: CreateUserInput, actor?: UserDTO): Promise<UserDTO> {
     const passwordHash = await hashPassword(input.password)
     const nowIso = new Date().toISOString()
 
-    return this.deps.userRepo.create({
+    const created = this.deps.userRepo.create({
       username: input.username,
       fullName: input.fullName,
       passwordHash,
       role: input.role,
       nowIso,
     })
+
+    if (actor && this.deps.auditService) {
+      this.deps.auditService.log({
+        actor,
+        actionType: 'USER_ACTIVATED',
+        resourceType: 'user',
+        resourceId: created.id,
+        details: {
+          username: created.username,
+          fullName: created.fullName,
+          role: created.role,
+        },
+      })
+    }
+
+    return created
   }
 
   public updateUser(
@@ -88,6 +108,36 @@ export class UserService implements UserServiceContract {
         this.deps.sessionRepo.deleteAllForUser(target.id)
       }
 
+      if (this.deps.auditService) {
+        if (nextRole !== target.role) {
+          this.deps.auditService.log({
+            actor,
+            actionType: 'USER_ROLE_CHANGED',
+            resourceType: 'user',
+            resourceId: target.id,
+            details: {
+              targetUserId: target.id,
+              username: target.username,
+              oldRole: target.role,
+              newRole: nextRole,
+            },
+          })
+        }
+
+        if (nextIsActive !== target.isActive) {
+          this.deps.auditService.log({
+            actor,
+            actionType: nextIsActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+            resourceType: 'user',
+            resourceId: target.id,
+            details: {
+              targetUserId: target.id,
+              username: target.username,
+            },
+          })
+        }
+      }
+
       return updated
     })
   }
@@ -95,6 +145,7 @@ export class UserService implements UserServiceContract {
   public async resetUserPassword(
     targetUserId: number,
     input: ResetUserPasswordInput,
+    actor?: UserDTO,
   ): Promise<void> {
     const target = this.deps.userRepo.findById(targetUserId)
     if (!target) {
@@ -110,6 +161,19 @@ export class UserService implements UserServiceContract {
         throw AppError.notFound('Pengguna tidak ditemukan.')
       }
       this.deps.sessionRepo.deleteAllForUser(targetUserId)
+
+      if (this.deps.auditService) {
+        this.deps.auditService.log({
+          actor: actor ?? null,
+          actionType: 'PASSWORD_RESET',
+          resourceType: 'user',
+          resourceId: target.id,
+          details: {
+            targetUserId: target.id,
+            username: target.username,
+          },
+        })
+      }
     })
   }
 }

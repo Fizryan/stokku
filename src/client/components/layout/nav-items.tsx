@@ -3,10 +3,14 @@ import type { Permission } from '../../../shared/constants.js'
 import type { AppRoute } from '../../stores/router.store.js'
 import {
   IconCatalog,
+  IconClock,
   IconDashboard,
+  IconHeart,
   IconInventory,
   IconPos,
   IconReceipt,
+  IconShield,
+  IconTruck,
   IconUsers,
 } from '../ui/Icons.js'
 
@@ -48,6 +52,20 @@ export const NAVIGATION_ITEMS: readonly NavigationItemConfig[] = [
     renderIcon: () => <IconInventory />,
   },
   {
+    route: '/purchases',
+    label: 'Pembelian & Supplier',
+    shortLabel: 'Beli',
+    permission: 'purchases:view',
+    renderIcon: () => <IconTruck />,
+  },
+  {
+    route: '/customers',
+    label: 'Pelanggan & Poin',
+    shortLabel: 'Member',
+    permission: 'customers:view',
+    renderIcon: () => <IconHeart />,
+  },
+  {
     route: '/sales',
     label: 'Riwayat Penjualan',
     shortLabel: 'Penjualan',
@@ -55,10 +73,24 @@ export const NAVIGATION_ITEMS: readonly NavigationItemConfig[] = [
     renderIcon: () => <IconReceipt />,
   },
   {
+    route: '/shifts',
+    label: 'Shift & Laci Kas',
+    shortLabel: 'Shift',
+    permission: 'shifts:view',
+    renderIcon: () => <IconClock />,
+  },
+  {
     route: '/users',
     label: 'Manajemen User',
     shortLabel: 'Pengguna',
     permission: 'users:manage',
     renderIcon: () => <IconUsers />,
+  },
+  {
+    route: '/system',
+    label: 'Sistem & Keamanan',
+    shortLabel: 'Sistem',
+    permission: 'audit:view',
+    renderIcon: () => <IconShield />,
   },
 ]

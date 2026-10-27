@@ -64,6 +64,12 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     const prod1 = p1Res.body.data
     const prod2 = p2Res.body.data
 
+    const openShiftRes = await owner.requestJson('/api/shifts/open', {
+      method: 'POST',
+      json: { openingCash: 150_000, notes: 'Shift pagi owner' },
+    })
+    assert.equal(openShiftRes.status, 201)
+
     // Reject underpaid checkout
     const underpaidRes = await owner.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',

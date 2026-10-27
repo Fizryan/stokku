@@ -30,10 +30,11 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000 \
     DATABASE_PATH=/data/stokku.sqlite \
+    BACKUP_DIR=/data/backups \
     SESSION_TTL_HOURS=24 \
     COOKIE_SECURE=auto
 
-RUN mkdir -p /data && chown -R node:node /data /app
+RUN mkdir -p /data/backups && chown -R node:node /data /app
 
 COPY --chown=node:node --from=builder /app/package.json ./package.json
 COPY --chown=node:node --from=builder /app/node_modules ./node_modules

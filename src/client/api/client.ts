@@ -1,35 +1,59 @@
 import { hc } from 'hono/client'
 import type { AppType } from '../../server/routes/index.js'
 import type {
+  AdjustCustomerPointsInput,
   CategoryInput,
   ChangePasswordInput,
   CheckoutSaleInput,
+  CloseShiftInput,
+  CreateCustomerInput,
   CreateProductInput,
+  CreatePurchaseInput,
+  CreateSupplierInput,
   CreateUserInput,
   InitialSetupInput,
   LoginInput,
+  OpenShiftInput,
   ProductStatusFilter,
+  RecordCashMovementInput,
   RecordStockMovementInput,
   ResetUserPasswordInput,
   SalesExportQueryInput,
+  UpdateCustomerInput,
   UpdateProductInput,
+  UpdatePurchasePaymentStatusInput,
+  UpdateSupplierInput,
   UpdateUserInput,
   VoidSaleInput,
 } from '../../shared/schemas/index.js'
 import type {
   ApiErrorDetail,
   ApiResponse,
+  AuditActionType,
+  AuditLogDTO,
   AuthSessionDTO,
+  BackupFileDTO,
+  CashShiftDetailDTO,
+  CashShiftMovementDTO,
+  CashShiftSummaryDTO,
   CategoryDTO,
+  CurrentShiftStatusDTO,
+  CustomerDTO,
+  CustomerPointMutationDTO,
   DashboardMetricsDTO,
   MovementType,
   PaginatedResult,
   PaymentMethod,
   ProductDTO,
+  PurchaseDetailDTO,
+  PurchasePaymentStatus,
+  PurchaseSummaryDTO,
   SaleDetailDTO,
   SaleStatus,
   SaleSummaryDTO,
+  ShiftStatus,
   StockMovementDTO,
+  SupplierDTO,
   UserDTO,
 } from './types-reexport.js'
 
@@ -368,6 +392,259 @@ export const api = {
     },
   },
 
+  shifts: {
+    getCurrent(signal?: AbortSignal): Promise<CurrentShiftStatusDTO> {
+      return unwrapApiResponse<CurrentShiftStatusDTO>(
+        rpcClient.api.shifts.current.$get({}, { init: { signal } }),
+      )
+    },
+    open(input: OpenShiftInput): Promise<CashShiftDetailDTO> {
+      return unwrapApiResponse<CashShiftDetailDTO>(
+        rpcClient.api.shifts.open.$post({ json: input }),
+      )
+    },
+    recordMovement(input: RecordCashMovementInput): Promise<CashShiftMovementDTO> {
+      return unwrapApiResponse<CashShiftMovementDTO>(
+        rpcClient.api.shifts['cash-movement'].$post({ json: input }),
+      )
+    },
+    close(input: CloseShiftInput): Promise<CashShiftDetailDTO> {
+      return unwrapApiResponse<CashShiftDetailDTO>(
+        rpcClient.api.shifts.close.$post({ json: input }),
+      )
+    },
+    list(
+      params: {
+        cashierUserId?: number
+        status?: ShiftStatus
+        dateFrom?: string
+        dateTo?: string
+        page?: number
+        pageSize?: number
+      } = {},
+      signal?: AbortSignal,
+    ): Promise<PaginatedResult<CashShiftSummaryDTO>> {
+      return unwrapApiResponse<PaginatedResult<CashShiftSummaryDTO>>(
+        rpcClient.api.shifts.$get(
+          {
+            query: {
+              cashierUserId:
+                params.cashierUserId !== undefined
+                  ? String(params.cashierUserId)
+                  : undefined,
+              status: params.status,
+              dateFrom: params.dateFrom || undefined,
+              dateTo: params.dateTo || undefined,
+              page: params.page !== undefined ? String(params.page) : undefined,
+              pageSize:
+                params.pageSize !== undefined ? String(params.pageSize) : undefined,
+            },
+          },
+          { init: { signal } },
+        ),
+      )
+    },
+    getDetail(id: number, signal?: AbortSignal): Promise<CashShiftDetailDTO> {
+      return unwrapApiResponse<CashShiftDetailDTO>(
+        rpcClient.api.shifts[':id'].$get(
+          { param: { id: String(id) } },
+          { init: { signal } },
+        ),
+      )
+    },
+  },
+
+  suppliers: {
+    list(
+      params: {
+        search?: string
+        status?: 'all' | 'active' | 'archived'
+        page?: number
+        pageSize?: number
+      } = {},
+      signal?: AbortSignal,
+    ): Promise<PaginatedResult<SupplierDTO>> {
+      return unwrapApiResponse<PaginatedResult<SupplierDTO>>(
+        rpcClient.api.suppliers.$get(
+          {
+            query: {
+              search: params.search || undefined,
+              status: params.status,
+              page: params.page !== undefined ? String(params.page) : undefined,
+              pageSize:
+                params.pageSize !== undefined ? String(params.pageSize) : undefined,
+            },
+          },
+          { init: { signal } },
+        ),
+      )
+    },
+    listActive(signal?: AbortSignal): Promise<readonly SupplierDTO[]> {
+      return unwrapApiResponse<readonly SupplierDTO[]>(
+        rpcClient.api.suppliers.active.$get({}, { init: { signal } }),
+      )
+    },
+    create(input: CreateSupplierInput): Promise<SupplierDTO> {
+      return unwrapApiResponse<SupplierDTO>(
+        rpcClient.api.suppliers.$post({ json: input }),
+      )
+    },
+    update(id: number, input: UpdateSupplierInput): Promise<SupplierDTO> {
+      return unwrapApiResponse<SupplierDTO>(
+        rpcClient.api.suppliers[':id'].$put({
+          param: { id: String(id) },
+          json: input,
+        }),
+      )
+    },
+    getById(id: number, signal?: AbortSignal): Promise<SupplierDTO> {
+      return unwrapApiResponse<SupplierDTO>(
+        rpcClient.api.suppliers[':id'].$get(
+          { param: { id: String(id) } },
+          { init: { signal } },
+        ),
+      )
+    },
+  },
+
+  purchases: {
+    create(input: CreatePurchaseInput): Promise<PurchaseDetailDTO> {
+      return unwrapApiResponse<PurchaseDetailDTO>(
+        rpcClient.api.purchases.$post({ json: input }),
+      )
+    },
+    list(
+      params: {
+        supplierId?: number
+        paymentStatus?: PurchasePaymentStatus
+        search?: string
+        dateFrom?: string
+        dateTo?: string
+        page?: number
+        pageSize?: number
+      } = {},
+      signal?: AbortSignal,
+    ): Promise<PaginatedResult<PurchaseSummaryDTO>> {
+      return unwrapApiResponse<PaginatedResult<PurchaseSummaryDTO>>(
+        rpcClient.api.purchases.$get(
+          {
+            query: {
+              supplierId:
+                params.supplierId !== undefined ? String(params.supplierId) : undefined,
+              paymentStatus: params.paymentStatus,
+              search: params.search || undefined,
+              dateFrom: params.dateFrom || undefined,
+              dateTo: params.dateTo || undefined,
+              page: params.page !== undefined ? String(params.page) : undefined,
+              pageSize:
+                params.pageSize !== undefined ? String(params.pageSize) : undefined,
+            },
+          },
+          { init: { signal } },
+        ),
+      )
+    },
+    getDetail(id: number, signal?: AbortSignal): Promise<PurchaseDetailDTO> {
+      return unwrapApiResponse<PurchaseDetailDTO>(
+        rpcClient.api.purchases[':id'].$get(
+          { param: { id: String(id) } },
+          { init: { signal } },
+        ),
+      )
+    },
+    updatePaymentStatus(
+      id: number,
+      input: UpdatePurchasePaymentStatusInput,
+    ): Promise<PurchaseDetailDTO> {
+      return unwrapApiResponse<PurchaseDetailDTO>(
+        rpcClient.api.purchases[':id'].payment.$patch({
+          param: { id: String(id) },
+          json: input,
+        }),
+      )
+    },
+  },
+
+  customers: {
+    list(
+      params: {
+        search?: string
+        status?: 'all' | 'active' | 'inactive'
+        page?: number
+        pageSize?: number
+      } = {},
+      signal?: AbortSignal,
+    ): Promise<PaginatedResult<CustomerDTO>> {
+      return unwrapApiResponse<PaginatedResult<CustomerDTO>>(
+        rpcClient.api.customers.$get(
+          {
+            query: {
+              search: params.search || undefined,
+              status: params.status,
+              page: params.page !== undefined ? String(params.page) : undefined,
+              pageSize:
+                params.pageSize !== undefined ? String(params.pageSize) : undefined,
+            },
+          },
+          { init: { signal } },
+        ),
+      )
+    },
+    getTop(signal?: AbortSignal): Promise<readonly CustomerDTO[]> {
+      return unwrapApiResponse<readonly CustomerDTO[]>(
+        rpcClient.api.customers.top.$get({}, { init: { signal } }),
+      )
+    },
+    getByPhone(phone: string, signal?: AbortSignal): Promise<CustomerDTO | null> {
+      return unwrapApiResponse<CustomerDTO | null>(
+        rpcClient.api.customers['by-phone'][':phone'].$get(
+          { param: { phone } },
+          { init: { signal } },
+        ),
+      )
+    },
+    getDetail(id: number, signal?: AbortSignal): Promise<CustomerDTO> {
+      return unwrapApiResponse<CustomerDTO>(
+        rpcClient.api.customers[':id'].$get(
+          { param: { id: String(id) } },
+          { init: { signal } },
+        ),
+      )
+    },
+    listMutations(
+      id: number,
+      signal?: AbortSignal,
+    ): Promise<readonly CustomerPointMutationDTO[]> {
+      return unwrapApiResponse<readonly CustomerPointMutationDTO[]>(
+        rpcClient.api.customers[':id'].mutations.$get(
+          { param: { id: String(id) } },
+          { init: { signal } },
+        ),
+      )
+    },
+    create(input: CreateCustomerInput): Promise<CustomerDTO> {
+      return unwrapApiResponse<CustomerDTO>(
+        rpcClient.api.customers.$post({ json: input }),
+      )
+    },
+    update(id: number, input: UpdateCustomerInput): Promise<CustomerDTO> {
+      return unwrapApiResponse<CustomerDTO>(
+        rpcClient.api.customers[':id'].$patch({
+          param: { id: String(id) },
+          json: input,
+        }),
+      )
+    },
+    adjustPoints(id: number, input: AdjustCustomerPointsInput): Promise<CustomerDTO> {
+      return unwrapApiResponse<CustomerDTO>(
+        rpcClient.api.customers[':id'].points.$post({
+          param: { id: String(id) },
+          json: input,
+        }),
+      )
+    },
+  },
+
   dashboard: {
     getMetrics(days = 14, signal?: AbortSignal): Promise<DashboardMetricsDTO> {
       return unwrapApiResponse<DashboardMetricsDTO>(
@@ -376,6 +653,46 @@ export const api = {
           { init: { signal } },
         ),
       )
+    },
+  },
+
+  audit: {
+    list(
+      params: {
+        page?: number
+        pageSize?: number
+        actionType?: AuditActionType
+        actorUserId?: number
+        dateFrom?: string
+        dateTo?: string
+      } = {},
+      signal?: AbortSignal,
+    ): Promise<PaginatedResult<AuditLogDTO>> {
+      const query: Record<string, string> = {}
+      if (params.page !== undefined) query.page = String(params.page)
+      if (params.pageSize !== undefined) query.pageSize = String(params.pageSize)
+      if (params.actionType) query.actionType = params.actionType
+      if (params.actorUserId !== undefined) query.actorUserId = String(params.actorUserId)
+      if (params.dateFrom) query.dateFrom = params.dateFrom
+      if (params.dateTo) query.dateTo = params.dateTo
+
+      return unwrapApiResponse<PaginatedResult<AuditLogDTO>>(
+        rpcClient.api.audit.$get({ query }, { init: { signal } }),
+      )
+    },
+  },
+
+  backup: {
+    list(signal?: AbortSignal): Promise<readonly BackupFileDTO[]> {
+      return unwrapApiResponse<readonly BackupFileDTO[]>(
+        rpcClient.api.backup.$get({}, { init: { signal } }),
+      )
+    },
+    create(): Promise<BackupFileDTO> {
+      return unwrapApiResponse<BackupFileDTO>(rpcClient.api.backup.$post({}))
+    },
+    getDownloadUrl(fileName: string): string {
+      return `/api/backup/${encodeURIComponent(fileName)}`
     },
   },
 }

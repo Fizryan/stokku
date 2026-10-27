@@ -1,8 +1,13 @@
 import type {
+  AuditActionType,
   MovementReferenceType,
   MovementType,
   PaymentMethod,
+  PointMutationType,
+  PurchasePaymentStatus,
   SaleStatus,
+  ShiftMovementType,
+  ShiftStatus,
   UserRole,
 } from './constants.js'
 
@@ -116,10 +121,15 @@ export interface SaleItemDTO {
 
 export interface SaleSummaryDTO {
   readonly id: number
+  readonly shiftId: number | null
   readonly invoiceNumber: string
   readonly cashierUserId: number
   readonly cashierName: string
+  readonly customerId: number | null
   readonly customerName: string | null
+  readonly pointsEarned: number
+  readonly pointsRedeemed: number
+  readonly pointsDiscountAmount: number
   readonly itemCount: number
   readonly totalQty: number
   readonly subtotalAmount: number
@@ -169,4 +179,135 @@ export interface DashboardMetricsDTO {
   readonly lowStockProducts: readonly ProductDTO[]
   readonly topProducts: readonly TopProductMetricDTO[]
   readonly recentSales: readonly SaleSummaryDTO[]
+}
+
+export interface CashShiftMovementDTO {
+  readonly id: number
+  readonly shiftId: number
+  readonly movementType: ShiftMovementType
+  readonly amount: number
+  readonly reason: string
+  readonly actorUserId: number
+  readonly actorName: string
+  readonly createdAt: string
+}
+
+export interface CashShiftSummaryDTO {
+  readonly id: number
+  readonly cashierUserId: number
+  readonly cashierName: string
+  readonly openedAt: string
+  readonly closedAt: string | null
+  readonly openingCash: number
+  readonly closingCash: number | null
+  readonly expectedCash: number
+  readonly cashDifference: number | null
+  readonly status: ShiftStatus
+  readonly notes: string | null
+  readonly totalCashSales: number
+  readonly totalNonCashSales: number
+  readonly totalCashIn: number
+  readonly totalCashOut: number
+  readonly transactionCount: number
+  readonly createdAt: string
+}
+
+export interface CashShiftDetailDTO extends CashShiftSummaryDTO {
+  readonly movements: readonly CashShiftMovementDTO[]
+}
+
+export interface CurrentShiftStatusDTO {
+  readonly hasActiveShift: boolean
+  readonly shift: CashShiftDetailDTO | null
+}
+
+export interface SupplierDTO {
+  readonly id: number
+  readonly name: string
+  readonly contactPerson: string | null
+  readonly phone: string | null
+  readonly address: string | null
+  readonly notes: string | null
+  readonly isActive: boolean
+  readonly createdAt: string
+}
+
+export interface PurchaseItemDTO {
+  readonly id: number
+  readonly purchaseId: number
+  readonly productId: number
+  readonly skuSnapshot: string
+  readonly productNameSnapshot: string
+  readonly unitSnapshot: string
+  readonly qty: number
+  readonly unitCost: number
+  readonly lineSubtotal: number
+}
+
+export interface PurchaseSummaryDTO {
+  readonly id: number
+  readonly invoiceNumber: string
+  readonly supplierId: number
+  readonly supplierName: string
+  readonly receiverUserId: number
+  readonly receiverName: string
+  readonly subtotalAmount: number
+  readonly paymentStatus: PurchasePaymentStatus
+  readonly dueDate: string | null
+  readonly notes: string | null
+  readonly itemCount: number
+  readonly totalQty: number
+  readonly createdAt: string
+}
+
+export interface PurchaseDetailDTO extends PurchaseSummaryDTO {
+  readonly items: readonly PurchaseItemDTO[]
+}
+
+export interface CustomerDTO {
+  readonly id: number
+  readonly phone: string
+  readonly name: string
+  readonly email: string | null
+  readonly address: string | null
+  readonly notes: string | null
+  readonly pointsBalance: number
+  readonly totalSpend: number
+  readonly visitCount: number
+  readonly isActive: boolean
+  readonly createdAt: string
+}
+
+export interface CustomerPointMutationDTO {
+  readonly id: number
+  readonly customerId: number
+  readonly points: number
+  readonly mutationType: PointMutationType
+  readonly referenceType: 'SALE' | 'MANUAL'
+  readonly referenceId: number | null
+  readonly description: string
+  readonly actorUserId: number
+  readonly actorName: string
+  readonly createdAt: string
+}
+
+export interface AuditLogDTO {
+  readonly id: number
+  readonly actorUserId: number | null
+  readonly actorName: string | null
+  readonly actorRole: UserRole | null
+  readonly actionType: AuditActionType
+  readonly resourceType: string
+  readonly resourceId: string | null
+  readonly details: Record<string, unknown> | null
+  readonly ipAddress: string | null
+  readonly userAgent: string | null
+  readonly createdAt: string
+}
+
+export interface BackupFileDTO {
+  readonly fileName: string
+  readonly fileSizeBytes: number
+  readonly createdAt: string
+  readonly downloadUrl: string
 }

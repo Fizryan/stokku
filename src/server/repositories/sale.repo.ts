@@ -19,10 +19,15 @@ import {
 
 interface RawSaleSummaryRow {
   id: number
+  shift_id: number | null
   invoice_number: string
   cashier_user_id: number
   cashier_name: string
+  customer_id: number | null
   customer_name: string | null
+  points_earned: number
+  points_redeemed: number
+  points_discount_amount: number
   subtotal_amount: number
   discount_amount: number
   total_amount: number
@@ -79,10 +84,15 @@ function mapSummaryRow(
 
   return {
     id: row.id,
+    shiftId: row.shift_id ?? null,
     invoiceNumber: row.invoice_number,
     cashierUserId: row.cashier_user_id,
     cashierName: row.cashier_name,
+    customerId: row.customer_id ?? null,
     customerName: row.customer_name,
+    pointsEarned: row.points_earned ?? 0,
+    pointsRedeemed: row.points_redeemed ?? 0,
+    pointsDiscountAmount: row.points_discount_amount ?? 0,
     itemCount: row.item_count,
     totalQty: row.total_qty,
     subtotalAmount: row.subtotal_amount,
@@ -137,7 +147,12 @@ export class SaleRepository {
       INSERT INTO sales (
         invoice_number,
         cashier_user_id,
+        shift_id,
+        customer_id,
         customer_name,
+        points_earned,
+        points_redeemed,
+        points_discount_amount,
         subtotal_amount,
         discount_amount,
         total_amount,
@@ -147,7 +162,7 @@ export class SaleRepository {
         status,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
     `)
     this.stmtInsertSaleItem = db.prepare(`
       INSERT INTO sale_items (
@@ -166,10 +181,15 @@ export class SaleRepository {
     this.stmtFindHeaderById = db.prepare(`
       SELECT
         s.id,
+        s.shift_id,
         s.invoice_number,
         s.cashier_user_id,
         u.full_name AS cashier_name,
+        s.customer_id,
         s.customer_name,
+        s.points_earned,
+        s.points_redeemed,
+        s.points_discount_amount,
         s.subtotal_amount,
         s.discount_amount,
         s.total_amount,
@@ -250,9 +270,14 @@ export class SaleRepository {
   }
 
   public createSaleRecord(params: {
+    shiftId?: number | null
     invoiceNumber: string
     cashierUserId: number
+    customerId?: number | null
     customerName: string | null
+    pointsEarned?: number
+    pointsRedeemed?: number
+    pointsDiscountAmount?: number
     subtotalAmount: number
     discountAmount: number
     totalAmount: number
@@ -274,7 +299,12 @@ export class SaleRepository {
     const headerRes = this.stmtInsertSale.run(
       params.invoiceNumber,
       params.cashierUserId,
+      params.shiftId ?? null,
+      params.customerId ?? null,
       params.customerName,
+      params.pointsEarned ?? 0,
+      params.pointsRedeemed ?? 0,
+      params.pointsDiscountAmount ?? 0,
       params.subtotalAmount,
       params.discountAmount,
       params.totalAmount,
