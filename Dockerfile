@@ -17,7 +17,7 @@ COPY biome.json index.html vite.config.ts tsconfig.json tsconfig.base.json tscon
 COPY src ./src
 COPY tests ./tests
 
-RUN pnpm run build && pnpm prune --prod
+RUN pnpm test && pnpm run build && pnpm prune --prod
 
 # ============================================================================
 # Stage 2: Minimal Production Runtime (Non-Root + Native node:sqlite)

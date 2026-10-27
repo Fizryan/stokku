@@ -3,6 +3,7 @@ import { PAYMENT_METHODS, SALE_STATUSES } from '../constants.js'
 import {
   intQueryParam,
   nonNegativeMoneySchema,
+  optionalEnumQueryParam,
   optionalIsoDateQuery,
   optionalQueryText,
   paginationQueryFields,
@@ -33,37 +34,21 @@ export const voidSaleSchema = z.object({
   reason: trimmedRequiredString('Alasan pembatalan transaksi', 5, 240),
 })
 
-export const salesQuerySchema = z.object({
+export const salesFilterBaseFields = {
   search: optionalQueryText,
-  status: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
-    .pipe(z.enum(SALE_STATUSES).optional()),
-  paymentMethod: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
-    .pipe(z.enum(PAYMENT_METHODS).optional()),
+  status: optionalEnumQueryParam(SALE_STATUSES),
+  paymentMethod: optionalEnumQueryParam(PAYMENT_METHODS),
   dateFrom: optionalIsoDateQuery,
   dateTo: optionalIsoDateQuery,
+}
+
+export const salesQuerySchema = z.object({
+  ...salesFilterBaseFields,
   ...paginationQueryFields,
 })
 
 export const salesExportQuerySchema = z.object({
-  search: optionalQueryText,
-  status: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
-    .pipe(z.enum(SALE_STATUSES).optional()),
-  paymentMethod: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
-    .pipe(z.enum(PAYMENT_METHODS).optional()),
-  dateFrom: optionalIsoDateQuery,
-  dateTo: optionalIsoDateQuery,
+  ...salesFilterBaseFields,
 })
 
 export const dashboardQuerySchema = z.object({

@@ -8,6 +8,7 @@ import type {
   CreateUserInput,
   InitialSetupInput,
   LoginInput,
+  ProductStatusFilter,
   RecordStockMovementInput,
   ResetUserPasswordInput,
   SalesExportQueryInput,
@@ -230,7 +231,7 @@ export const api = {
       params: {
         search?: string
         categoryId?: number
-        status?: 'active' | 'archived' | 'all'
+        status?: ProductStatusFilter
         lowStockOnly?: boolean
         page?: number
         pageSize?: number

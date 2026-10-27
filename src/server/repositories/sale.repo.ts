@@ -463,20 +463,18 @@ export class SaleRepository {
         s.discount_amount,
         s.total_amount,
         s.void_reason,
-        COALESCE(agg.item_count, 0) AS item_count,
-        COALESCE(agg.total_qty, 0) AS total_qty,
-        COALESCE(agg.gross_margin_before_discount, 0) AS gross_margin_before_discount
+        COALESCE((SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id), 0) AS item_count,
+        COALESCE((SELECT SUM(si.qty) FROM sale_items si WHERE si.sale_id = s.id), 0) AS total_qty,
+        COALESCE(
+          (
+            SELECT SUM((si.sell_price_at_sale - si.cost_price_at_sale) * si.qty)
+            FROM sale_items si
+            WHERE si.sale_id = s.id
+          ),
+          0
+        ) AS gross_margin_before_discount
       FROM sales s
       INNER JOIN users u ON u.id = s.cashier_user_id
-      LEFT JOIN (
-        SELECT
-          sale_id,
-          COUNT(*) AS item_count,
-          SUM(qty) AS total_qty,
-          SUM((sell_price_at_sale - cost_price_at_sale) * qty) AS gross_margin_before_discount
-        FROM sale_items
-        GROUP BY sale_id
-      ) agg ON agg.sale_id = s.id
       ${whereClause}
       ORDER BY s.created_at DESC, s.id DESC
     `)

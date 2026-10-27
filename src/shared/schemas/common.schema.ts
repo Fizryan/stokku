@@ -92,6 +92,18 @@ export const optionalPositiveIntQuery = z
     message: 'Parameter ID harus berupa bilangan bulat positif.',
   })
 
+export function optionalEnumQueryParam<
+  const TValues extends readonly [string, ...string[]],
+>(values: TValues, defaultValue?: TValues[number]) {
+  const base = z
+    .string()
+    .optional()
+    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
+    .pipe(z.enum(values).optional())
+
+  return defaultValue !== undefined ? base.default(defaultValue) : base
+}
+
 export const booleanQueryFlag = z
   .string()
   .optional()

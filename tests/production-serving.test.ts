@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, it } from 'node:test'
 import { createServerApp } from '../src/server/app.js'
 import { loadServerConfig } from '../src/server/config/env.js'
@@ -8,10 +16,15 @@ import { type AppContainer, createAppContainer } from '../src/server/container.j
 
 describe('Production Static SPA Serving & Healthcheck', () => {
   let container: AppContainer | null = null
+  let tempFixtureDir: string | null = null
 
   afterEach(() => {
     container?.dispose()
     container = null
+    if (tempFixtureDir && existsSync(tempFixtureDir)) {
+      rmSync(tempFixtureDir, { recursive: true, force: true })
+      tempFixtureDir = null
+    }
   })
 
   it('serves /api/health, immutable /assets/*, SPA deep-link fallback, and JSON 404 for unknown /api/*', async () => {
@@ -25,12 +38,23 @@ describe('Production Static SPA Serving & Healthcheck', () => {
     })
 
     container = createAppContainer(config)
-    const distDir = resolve('./dist/client')
-    assert.equal(
-      existsSync(resolve(distDir, 'index.html')),
-      true,
-      'dist/client/index.html must exist after build',
-    )
+
+    let distDir = resolve('./dist/client')
+    if (!existsSync(resolve(distDir, 'index.html'))) {
+      tempFixtureDir = mkdtempSync(join(tmpdir(), 'stokku-dist-test-'))
+      distDir = tempFixtureDir
+      mkdirSync(resolve(distDir, 'assets'), { recursive: true })
+      writeFileSync(
+        resolve(distDir, 'index.html'),
+        '<!doctype html><html><body><div id="root"></div></body></html>',
+        'utf-8',
+      )
+      writeFileSync(
+        resolve(distDir, 'assets', 'index-test.js'),
+        'console.log("stokku test bundle")',
+        'utf-8',
+      )
+    }
 
     const app = createServerApp({
       services: container.services,

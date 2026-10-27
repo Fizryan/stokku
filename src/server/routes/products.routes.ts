@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import {
   createProductSchema,
   idParamSchema,
+  lookupProductQuerySchema,
   productQuerySchema,
   updateProductSchema,
 } from '../../shared/schemas/index.js'
@@ -17,10 +17,6 @@ import {
   validateQuery,
 } from '../middlewares/validator.middleware.js'
 
-const lookupCodeQuerySchema = z.object({
-  code: z.string().trim().min(1, 'Kode SKU atau barcode wajib diisi.').max(64),
-})
-
 export function createProductsRoutes(services: AppServices) {
   const requireAuth = createRequireAuthMiddleware(services)
   const canView = requirePermission('catalog:view')
@@ -34,7 +30,7 @@ export function createProductsRoutes(services: AppServices) {
       const result = services.catalog.listProducts(actor, query)
       return c.json({ ok: true as const, data: result }, 200)
     })
-    .get('/lookup', canView, validateQuery(lookupCodeQuerySchema), (c) => {
+    .get('/lookup', canView, validateQuery(lookupProductQuerySchema), (c) => {
       const actor = c.get('currentUser')
       const { code } = c.req.valid('query')
       const product = services.catalog.lookupProductByCode(actor, code)

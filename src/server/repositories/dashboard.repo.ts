@@ -52,15 +52,17 @@ export class DashboardRepository {
       SELECT
         COALESCE(SUM(s.total_amount), 0) AS revenue_amount,
         COUNT(s.id) AS transaction_count,
-        COALESCE(SUM(COALESCE(item_agg.margin, 0) - s.discount_amount), 0) AS gross_profit_amount
+        COALESCE(
+          SUM(
+            (
+              SELECT COALESCE(SUM((si.sell_price_at_sale - si.cost_price_at_sale) * si.qty), 0)
+              FROM sale_items si
+              WHERE si.sale_id = s.id
+            ) - s.discount_amount
+          ),
+          0
+        ) AS gross_profit_amount
       FROM sales s
-      LEFT JOIN (
-        SELECT
-          sale_id,
-          SUM((sell_price_at_sale - cost_price_at_sale) * qty) AS margin
-        FROM sale_items
-        GROUP BY sale_id
-      ) item_agg ON item_agg.sale_id = s.id
       WHERE s.status = 'COMPLETED'
         AND s.created_at >= ?
         AND s.created_at <= ?
@@ -70,15 +72,14 @@ export class DashboardRepository {
       SELECT
         s.created_at,
         s.total_amount,
-        (COALESCE(item_agg.margin, 0) - s.discount_amount) AS gross_profit
+        (
+          (
+            SELECT COALESCE(SUM((si.sell_price_at_sale - si.cost_price_at_sale) * si.qty), 0)
+            FROM sale_items si
+            WHERE si.sale_id = s.id
+          ) - s.discount_amount
+        ) AS gross_profit
       FROM sales s
-      LEFT JOIN (
-        SELECT
-          sale_id,
-          SUM((sell_price_at_sale - cost_price_at_sale) * qty) AS margin
-        FROM sale_items
-        GROUP BY sale_id
-      ) item_agg ON item_agg.sale_id = s.id
       WHERE s.status = 'COMPLETED'
         AND s.created_at >= ?
         AND s.created_at <= ?
