@@ -32,7 +32,9 @@ function buildQuickCashDenominations(total: number): readonly number[] {
 export function CheckoutModal(props: CheckoutModalProps) {
   const {
     lines,
-    effectiveDiscountAmount,
+    discountAmount,
+    selectedCustomer,
+    pointsRedeemed,
     grandTotalAmount,
     paymentMethod,
     customerName,
@@ -78,10 +80,14 @@ export function CheckoutModal(props: CheckoutModalProps) {
     try {
       const receipt = await api.sales.checkout({
         items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
-        discountAmount: effectiveDiscountAmount,
+        discountAmount,
+        customerId: selectedCustomer?.id ?? null,
+        pointsRedeemed,
         paymentMethod,
         paidAmount,
-        customerName: customerName.trim() || null,
+        customerName: selectedCustomer
+          ? selectedCustomer.name
+          : customerName.trim() || null,
       })
 
       clearCart()

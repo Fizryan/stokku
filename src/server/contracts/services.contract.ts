@@ -1,31 +1,58 @@
+import type { AuditActionType } from '../../shared/constants.js'
 import type {
+  AdjustCustomerPointsInput,
+  AuditLogsQueryInput,
   CategoryInput,
   ChangePasswordInput,
   CheckoutSaleInput,
+  CloseShiftInput,
+  CreateCustomerInput,
   CreateProductInput,
+  CreatePurchaseInput,
+  CreateSupplierInput,
   CreateUserInput,
+  CustomersQueryInput,
   DashboardQueryInput,
   InitialSetupInput,
   LoginInput,
   MovementQueryInput,
+  OpenShiftInput,
   ProductQueryInput,
+  PurchasesQueryInput,
+  RecordCashMovementInput,
   RecordStockMovementInput,
   ResetUserPasswordInput,
   SalesExportQueryInput,
   SalesQueryInput,
+  ShiftsQueryInput,
+  SuppliersQueryInput,
+  UpdateCustomerInput,
   UpdateProductInput,
+  UpdatePurchasePaymentStatusInput,
+  UpdateSupplierInput,
   UpdateUserInput,
   VoidSaleInput,
 } from '../../shared/schemas/index.js'
 import type {
+  AuditLogDTO,
   AuthSessionDTO,
+  BackupFileDTO,
+  CashShiftDetailDTO,
+  CashShiftMovementDTO,
+  CashShiftSummaryDTO,
   CategoryDTO,
+  CurrentShiftStatusDTO,
+  CustomerDTO,
+  CustomerPointMutationDTO,
   DashboardMetricsDTO,
   PaginatedResult,
   ProductDTO,
+  PurchaseDetailDTO,
+  PurchaseSummaryDTO,
   SaleDetailDTO,
   SaleSummaryDTO,
   StockMovementDTO,
+  SupplierDTO,
   UserDTO,
 } from '../../shared/types.js'
 
@@ -64,9 +91,13 @@ export interface AuthServiceContract {
 
 export interface UserServiceContract {
   listUsers(): readonly UserDTO[]
-  createUser(input: CreateUserInput): Promise<UserDTO>
+  createUser(input: CreateUserInput, actor?: UserDTO): Promise<UserDTO>
   updateUser(actor: UserDTO, targetUserId: number, input: UpdateUserInput): UserDTO
-  resetUserPassword(targetUserId: number, input: ResetUserPasswordInput): Promise<void>
+  resetUserPassword(
+    targetUserId: number,
+    input: ResetUserPasswordInput,
+    actor?: UserDTO,
+  ): Promise<void>
 }
 
 export interface CatalogServiceContract {
@@ -97,9 +128,77 @@ export interface PosServiceContract {
   voidSale(actor: UserDTO, saleId: number, input: VoidSaleInput): SaleDetailDTO
 }
 
+export interface ShiftServiceContract {
+  getCurrentShift(actor: UserDTO): CurrentShiftStatusDTO
+  openShift(actor: UserDTO, input: OpenShiftInput): CashShiftDetailDTO
+  recordMovement(actor: UserDTO, input: RecordCashMovementInput): CashShiftMovementDTO
+  closeShift(actor: UserDTO, input: CloseShiftInput): CashShiftDetailDTO
+  listShifts(
+    actor: UserDTO,
+    query: ShiftsQueryInput,
+  ): PaginatedResult<CashShiftSummaryDTO>
+  getShiftDetail(actor: UserDTO, shiftId: number): CashShiftDetailDTO
+}
+
+export interface SupplierServiceContract {
+  listSuppliers(query: SuppliersQueryInput): PaginatedResult<SupplierDTO>
+  listActiveSuppliers(): readonly SupplierDTO[]
+  getSupplierById(id: number): SupplierDTO
+  createSupplier(input: CreateSupplierInput): SupplierDTO
+  updateSupplier(id: number, input: UpdateSupplierInput): SupplierDTO
+}
+
+export interface PurchaseServiceContract {
+  createPurchase(actor: UserDTO, input: CreatePurchaseInput): PurchaseDetailDTO
+  listPurchases(query: PurchasesQueryInput): PaginatedResult<PurchaseSummaryDTO>
+  getPurchaseDetail(id: number): PurchaseDetailDTO
+  updatePaymentStatus(
+    id: number,
+    input: UpdatePurchasePaymentStatusInput,
+  ): PurchaseDetailDTO
+}
+
+export interface CustomerServiceContract {
+  listCustomers(query: CustomersQueryInput): PaginatedResult<CustomerDTO>
+  getCustomerById(id: number): CustomerDTO
+  getCustomerByPhone(phone: string): CustomerDTO | null
+  getTopCustomers(limit?: number): readonly CustomerDTO[]
+  createCustomer(input: CreateCustomerInput): CustomerDTO
+  updateCustomer(id: number, input: UpdateCustomerInput): CustomerDTO
+  adjustPoints(
+    actor: UserDTO,
+    customerId: number,
+    input: AdjustCustomerPointsInput,
+  ): CustomerDTO
+  listPointMutations(
+    customerId: number,
+    limit?: number,
+  ): readonly CustomerPointMutationDTO[]
+}
+
 export interface ReportServiceContract {
   getDashboardMetrics(actor: UserDTO, query: DashboardQueryInput): DashboardMetricsDTO
-  exportSalesCsv(query: SalesExportQueryInput): string
+  exportSalesCsv(query: SalesExportQueryInput, actor?: UserDTO): string
+}
+
+export interface AuditServiceContract {
+  log(params: {
+    actor?: UserDTO | null
+    actionType: AuditActionType
+    resourceType: string
+    resourceId?: string | number | null
+    details?: Record<string, unknown> | null
+    ipAddress?: string | null
+    userAgent?: string | null
+  }): AuditLogDTO
+  listAuditLogs(query: AuditLogsQueryInput): PaginatedResult<AuditLogDTO>
+}
+
+export interface BackupServiceContract {
+  createBackup(actor: UserDTO, meta?: SessionClientMetadata): BackupFileDTO
+  listBackups(): readonly BackupFileDTO[]
+  getBackupFilePath(fileName: string): string
+  getBackupFileBuffer(fileName: string): Uint8Array
 }
 
 export interface HealthServiceContract {
@@ -122,7 +221,13 @@ export interface AppServices {
   readonly catalog: CatalogServiceContract
   readonly inventory: InventoryServiceContract
   readonly pos: PosServiceContract
+  readonly shifts: ShiftServiceContract
+  readonly suppliers: SupplierServiceContract
+  readonly purchases: PurchaseServiceContract
+  readonly customers: CustomerServiceContract
   readonly reports: ReportServiceContract
+  readonly audit: AuditServiceContract
+  readonly backup: BackupServiceContract
   readonly health: HealthServiceContract
   readonly cookieConfig: CookieSecurityConfig
 }

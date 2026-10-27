@@ -17,6 +17,7 @@ const envSchema = z.object({
     .transform((v) => (v ? Number.parseInt(v, 10) : 24))
     .pipe(z.number().int().min(1).max(720)),
   COOKIE_SECURE: z.enum(['auto', 'true', 'false']).default('auto'),
+  BACKUP_DIR: z.string().trim().min(1).optional(),
   CORS_ORIGINS: z
     .string()
     .optional()
@@ -35,6 +36,7 @@ export interface ServerConfig {
   readonly host: string
   readonly port: number
   readonly databasePath: string
+  readonly backupDir: string
   readonly sessionTtlMs: number
   readonly cookieSecure: 'auto' | 'true' | 'false'
   readonly corsOrigins: readonly string[]
@@ -49,11 +51,20 @@ export function loadServerConfig(rawEnv: NodeJS.ProcessEnv = process.env): Serve
     mkdirSync(dirname(resolvedDbPath), { recursive: true })
   }
 
+  const resolvedBackupDir = parsed.BACKUP_DIR
+    ? resolve(parsed.BACKUP_DIR)
+    : resolvedDbPath === ':memory:'
+      ? resolve('./data/backups')
+      : resolve(dirname(resolvedDbPath), 'backups')
+
+  mkdirSync(resolvedBackupDir, { recursive: true })
+
   return {
     nodeEnv: parsed.NODE_ENV,
     host: parsed.HOST,
     port: parsed.PORT,
     databasePath: resolvedDbPath,
+    backupDir: resolvedBackupDir,
     sessionTtlMs: parsed.SESSION_TTL_HOURS * 60 * 60 * 1000,
     cookieSecure: parsed.COOKIE_SECURE,
     corsOrigins: parsed.CORS_ORIGINS,

@@ -95,7 +95,7 @@ export interface TestHarness {
   readonly dispose: () => void
 }
 
-export function createTestHarness(): TestHarness {
+export function createTestHarness(customEnv?: NodeJS.ProcessEnv): TestHarness {
   const config = loadServerConfig({
     NODE_ENV: 'test',
     HOST: '127.0.0.1',
@@ -103,6 +103,7 @@ export function createTestHarness(): TestHarness {
     DATABASE_PATH: ':memory:',
     SESSION_TTL_HOURS: '24',
     COOKIE_SECURE: 'false',
+    ...(customEnv ?? {}),
   })
 
   const container = createAppContainer(config)

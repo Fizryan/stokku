@@ -3,6 +3,7 @@ import { MOVEMENT_TYPES } from '../constants.js'
 import {
   nonNegativeMoneySchema,
   nonNegativeQtySchema,
+  optionalEnumQueryParam,
   optionalIsoDateQuery,
   optionalPositiveIntQuery,
   paginationQueryFields,
@@ -40,11 +41,7 @@ export const recordStockMovementSchema = z.discriminatedUnion('movementType', [
 
 export const movementQuerySchema = z.object({
   productId: optionalPositiveIntQuery,
-  movementType: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : undefined))
-    .pipe(z.enum(MOVEMENT_TYPES).optional()),
+  movementType: optionalEnumQueryParam(MOVEMENT_TYPES),
   dateFrom: optionalIsoDateQuery,
   dateTo: optionalIsoDateQuery,
   ...paginationQueryFields,

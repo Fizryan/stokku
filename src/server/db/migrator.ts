@@ -3,9 +3,19 @@ import {
   type DatabaseMigration,
   migration001InitialSchema,
 } from './migrations/001_initial_schema.js'
+import { migration002CashShifts } from './migrations/002_cash_shifts.js'
+import { migration003PurchasesAndSuppliers } from './migrations/003_purchases_and_suppliers.js'
+import { migration004CustomersAndLoyalty } from './migrations/004_customers_and_loyalty.js'
+import { migration005AuditLogs } from './migrations/005_audit_logs.js'
 import { runInImmediateTransaction } from './transaction.js'
 
-const ALL_MIGRATIONS: readonly DatabaseMigration[] = [migration001InitialSchema]
+const ALL_MIGRATIONS: readonly DatabaseMigration[] = [
+  migration001InitialSchema,
+  migration002CashShifts,
+  migration003PurchasesAndSuppliers,
+  migration004CustomersAndLoyalty,
+  migration005AuditLogs,
+]
 
 export function runDatabaseMigrations(db: DatabaseSync): void {
   db.exec(`

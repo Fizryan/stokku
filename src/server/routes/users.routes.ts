@@ -23,8 +23,9 @@ export function createUsersRoutes(services: AppServices) {
       return c.json({ ok: true as const, data: users }, 200)
     })
     .post('/', validateJson(createUserSchema), async (c) => {
+      const actor = c.get('currentUser')
       const input = c.req.valid('json')
-      const created = await services.users.createUser(input)
+      const created = await services.users.createUser(input, actor)
       return c.json({ ok: true as const, data: created }, 201)
     })
     .patch('/:id', validateParam(idParamSchema), validateJson(updateUserSchema), (c) => {
@@ -39,9 +40,10 @@ export function createUsersRoutes(services: AppServices) {
       validateParam(idParamSchema),
       validateJson(resetUserPasswordSchema),
       async (c) => {
+        const actor = c.get('currentUser')
         const { id } = c.req.valid('param')
         const input = c.req.valid('json')
-        await services.users.resetUserPassword(id, input)
+        await services.users.resetUserPassword(id, input, actor)
         return c.json({ ok: true as const, data: { reset: true } }, 200)
       },
     )

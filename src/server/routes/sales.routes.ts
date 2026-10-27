@@ -33,8 +33,9 @@ export function createSalesRoutes(services: AppServices) {
       return c.json({ ok: true as const, data: result }, 200)
     })
     .get('/export.csv', canExport, validateQuery(salesExportQuerySchema), (c) => {
+      const actor = c.get('currentUser')
       const query = c.req.valid('query')
-      const csvContent = services.reports.exportSalesCsv(query)
+      const csvContent = services.reports.exportSalesCsv(query, actor)
       const stamp = new Date().toISOString().slice(0, 10)
       return c.body(csvContent, 200, {
         'Content-Type': 'text/csv; charset=utf-8',

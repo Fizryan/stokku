@@ -13,8 +13,12 @@ export const APP_ROUTES = [
   '/pos',
   '/catalog',
   '/inventory',
+  '/purchases',
+  '/customers',
   '/sales',
+  '/shifts',
   '/users',
+  '/system',
 ] as const
 
 export type AppRoute = (typeof APP_ROUTES)[number]

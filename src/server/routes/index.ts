@@ -1,12 +1,18 @@
 import { Hono } from 'hono'
 import type { AppServices, HonoAppEnv } from '../contracts/services.contract.js'
+import { createAuditRoutes } from './audit.routes.js'
 import { createAuthRoutes } from './auth.routes.js'
+import { createBackupRoutes } from './backup.routes.js'
 import { createCategoriesRoutes } from './categories.routes.js'
+import { createCustomersRoutes } from './customers.routes.js'
 import { createDashboardRoutes } from './dashboard.routes.js'
 import { createHealthRoutes } from './health.routes.js'
 import { createInventoryRoutes } from './inventory.routes.js'
 import { createProductsRoutes } from './products.routes.js'
+import { createPurchasesRoutes } from './purchases.routes.js'
 import { createSalesRoutes } from './sales.routes.js'
+import { createShiftsRoutes } from './shifts.routes.js'
+import { createSuppliersRoutes } from './suppliers.routes.js'
 import { createUsersRoutes } from './users.routes.js'
 
 export function createApiRoutes(services: AppServices) {
@@ -19,6 +25,12 @@ export function createApiRoutes(services: AppServices) {
     .route('/products', createProductsRoutes(services))
     .route('/inventory', createInventoryRoutes(services))
     .route('/sales', createSalesRoutes(services))
+    .route('/shifts', createShiftsRoutes(services))
+    .route('/suppliers', createSuppliersRoutes(services))
+    .route('/purchases', createPurchasesRoutes(services))
+    .route('/customers', createCustomersRoutes(services))
+    .route('/audit', createAuditRoutes(services))
+    .route('/backup', createBackupRoutes(services))
     .route('/dashboard', createDashboardRoutes(services))
 }
 

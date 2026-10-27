@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'hono/jsx/dom'
 import { formatInteger, formatRupiah } from '../../../shared/formatters.js'
+import type { ProductStatusFilter } from '../../../shared/schemas/index.js'
 import type { CategoryDTO, PaginatedResult, ProductDTO } from '../../../shared/types.js'
 import { api, ClientApiError, isAbortError } from '../../api/client.js'
 import { Badge } from '../../components/ui/Badge.js'
@@ -37,9 +38,7 @@ export function CatalogPage() {
 
   const [search, setSearch] = useState('')
   const [categoryIdFilter, setCategoryIdFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'active' | 'archived' | 'all'>(
-    'active',
-  )
+  const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('active')
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [page, setPage] = useState(1)
 

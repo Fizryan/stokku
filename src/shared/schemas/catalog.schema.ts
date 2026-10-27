@@ -4,6 +4,7 @@ import {
   booleanQueryFlag,
   nonNegativeMoneySchema,
   nonNegativeQtySchema,
+  optionalEnumQueryParam,
   optionalPositiveIntQuery,
   optionalQueryText,
   paginationQueryFields,
@@ -82,20 +83,22 @@ export const updateProductSchema = z.object({
 })
 
 export const productStatusFilterValues = ['active', 'archived', 'all'] as const
+export type ProductStatusFilter = (typeof productStatusFilterValues)[number]
 
 export const productQuerySchema = z.object({
   search: optionalQueryText,
   categoryId: optionalPositiveIntQuery,
-  status: z
-    .string()
-    .optional()
-    .transform((val) => (val && val.trim() !== '' ? val.trim() : 'active'))
-    .pipe(z.enum(productStatusFilterValues)),
+  status: optionalEnumQueryParam(productStatusFilterValues, 'active'),
   lowStockOnly: booleanQueryFlag,
   ...paginationQueryFields,
+})
+
+export const lookupProductQuerySchema = z.object({
+  code: z.string().trim().min(1, 'Kode SKU atau barcode wajib diisi.').max(64),
 })
 
 export type CategoryInput = z.infer<typeof categoryInputSchema>
 export type CreateProductInput = z.infer<typeof createProductSchema>
 export type UpdateProductInput = z.infer<typeof updateProductSchema>
 export type ProductQueryInput = z.infer<typeof productQuerySchema>
+export type LookupProductQueryInput = z.infer<typeof lookupProductQuerySchema>

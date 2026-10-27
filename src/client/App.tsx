@@ -8,10 +8,14 @@ import { ToastViewport } from './components/ui/ToastViewport.js'
 import { LoginPage } from './features/auth/LoginPage.js'
 import { SetupOwnerPage } from './features/auth/SetupOwnerPage.js'
 import { CatalogPage } from './features/catalog/CatalogPage.js'
+import { CustomersPage } from './features/customers/CustomersPage.js'
 import { DashboardPage } from './features/dashboard/DashboardPage.js'
 import { InventoryPage } from './features/inventory/InventoryPage.js'
 import { PosPage } from './features/pos/PosPage.js'
+import { PurchasesPage } from './features/purchases/PurchasesPage.js'
 import { SalesHistoryPage } from './features/sales/SalesHistoryPage.js'
+import { ShiftsHistoryPage } from './features/shifts/ShiftsHistoryPage.js'
+import { SystemPage } from './features/system/SystemPage.js'
 import { UsersPage } from './features/users/UsersPage.js'
 import { useAuth } from './stores/auth.store.js'
 import { type AppRoute, useRouter } from './stores/router.store.js'
@@ -21,8 +25,12 @@ const ROUTE_PERMISSIONS: Readonly<Record<AppRoute, Permission>> = {
   '/pos': 'pos:checkout',
   '/catalog': 'catalog:view',
   '/inventory': 'inventory:view',
+  '/purchases': 'purchases:view',
+  '/customers': 'customers:view',
   '/sales': 'sales:view',
+  '/shifts': 'shifts:view',
   '/users': 'users:manage',
+  '/system': 'audit:view',
 }
 
 function ActiveRouteView() {
@@ -56,10 +64,18 @@ function ActiveRouteView() {
       return <CatalogPage />
     case '/inventory':
       return <InventoryPage />
+    case '/purchases':
+      return <PurchasesPage />
+    case '/customers':
+      return <CustomersPage />
     case '/sales':
       return <SalesHistoryPage />
+    case '/shifts':
+      return <ShiftsHistoryPage />
     case '/users':
       return <UsersPage />
+    case '/system':
+      return <SystemPage />
   }
 }
 

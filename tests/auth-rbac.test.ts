@@ -159,6 +159,12 @@ describe('Authentication, Session Revocation & RBAC Matrix', () => {
     assert(cashierProducts.body.ok)
     assert.equal(cashierProducts.body.data.items[0]?.costPrice, null)
 
+    const openShiftRes = await cashierClient.requestJson('/api/shifts/open', {
+      method: 'POST',
+      json: { openingCash: 100_000, notes: 'Modal awal kasir 1' },
+    })
+    assert.equal(openShiftRes.status, 201)
+
     const cashierSale = await cashierClient.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',
       json: {

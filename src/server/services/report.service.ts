@@ -8,13 +8,17 @@ import type {
   SalesExportQueryInput,
 } from '../../shared/schemas/index.js'
 import type { DashboardMetricsDTO, UserDTO } from '../../shared/types.js'
-import type { ReportServiceContract } from '../contracts/services.contract.js'
+import type {
+  AuditServiceContract,
+  ReportServiceContract,
+} from '../contracts/services.contract.js'
 import type { DashboardRepository } from '../repositories/dashboard.repo.js'
 import type { SaleRepository } from '../repositories/sale.repo.js'
 
 export interface ReportServiceDeps {
   readonly dashboardRepo: DashboardRepository
   readonly saleRepo: SaleRepository
+  readonly auditService?: AuditServiceContract
 }
 
 function escapeCsvCell(rawValue: string | number | null | undefined): string {
@@ -76,7 +80,7 @@ export class ReportService implements ReportServiceContract {
     })
   }
 
-  public exportSalesCsv(query: SalesExportQueryInput): string {
+  public exportSalesCsv(query: SalesExportQueryInput, actor?: UserDTO): string {
     const headers = [
       'No Invoice',
       'Waktu Transaksi (UTC)',
@@ -113,6 +117,20 @@ export class ReportService implements ReportServiceContract {
           escapeCsvCell(row.voidReason),
         ].join(','),
       )
+    }
+
+    if (actor && this.deps.auditService) {
+      this.deps.auditService.log({
+        actor,
+        actionType: 'SALES_EXPORTED',
+        resourceType: 'sales',
+        resourceId: null,
+        details: {
+          dateFrom: query.dateFrom ?? null,
+          dateTo: query.dateTo ?? null,
+          exportedLines: lines.length - 1,
+        },
+      })
     }
 
     return lines.join('\r\n')

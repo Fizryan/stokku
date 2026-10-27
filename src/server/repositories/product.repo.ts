@@ -111,6 +111,7 @@ export class ProductRepository {
   private readonly stmtFindActiveByCode: StatementSync
   private readonly stmtInsert: StatementSync
   private readonly stmtUpdateMetadata: StatementSync
+  private readonly findByIdsStmtCache = new Map<number, StatementSync>()
 
   public constructor(db: DatabaseSync) {
     this.db = db
@@ -165,8 +166,13 @@ export class ProductRepository {
     if (ids.length === 0) return result
 
     const uniqueIds = Array.from(new Set(ids))
-    const placeholders = uniqueIds.map(() => '?').join(', ')
-    const stmt = this.db.prepare(`${BASE_PRODUCT_SELECT} WHERE p.id IN (${placeholders})`)
+    let stmt = this.findByIdsStmtCache.get(uniqueIds.length)
+    if (!stmt) {
+      const placeholders = uniqueIds.map(() => '?').join(', ')
+      stmt = this.db.prepare(`${BASE_PRODUCT_SELECT} WHERE p.id IN (${placeholders})`)
+      this.findByIdsStmtCache.set(uniqueIds.length, stmt)
+    }
+
     const rows = stmt.all(...uniqueIds) as unknown as RawProductRow[]
     for (const row of rows) {
       result.set(row.id, mapRawToRecord(row))
