@@ -312,3 +312,27 @@ export interface BackupFileDTO {
   readonly createdAt: string
   readonly downloadUrl: string
 }
+
+export interface CashRoundingResult {
+  readonly originalAmount: number
+  readonly roundedAmount: number
+  readonly roundingDifference: number
+  readonly isRounded: boolean
+}
+
+export interface StockDeficiencyItem {
+  readonly productId: number
+  readonly sku: string
+  readonly name: string
+  readonly unit: string
+  readonly requestedQty: number
+  readonly availableQty: number
+  readonly deficitQty: number
+}
+
+export interface ReceiptVerificationResult {
+  readonly isValid: boolean
+  readonly invoiceNumber: string
+  readonly verifiedAt: string
+  readonly message: string
+}

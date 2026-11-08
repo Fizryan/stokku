@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import {
   checkoutSaleSchema,
   idParamSchema,
+  receiptVerifyQuerySchema,
   salesExportQuerySchema,
   salesQuerySchema,
   voidSaleSchema,
@@ -66,6 +67,20 @@ export function createSalesRoutes(services: AppServices) {
         const input = c.req.valid('json')
         const voided = services.pos.voidSale(actor, id, input)
         return c.json({ ok: true as const, data: voided }, 200)
+      },
+    )
+
+    .get(
+      '/:id/verify',
+      canView,
+      validateParam(idParamSchema),
+      validateQuery(receiptVerifyQuerySchema),
+      (c) => {
+        const actor = c.get('currentUser')
+        const { id } = c.req.valid('param')
+        const { signature } = c.req.valid('query')
+        const result = services.pos.verifyReceipt(actor, id, signature)
+        return c.json({ ok: true as const, data: result }, 200)
       },
     )
 }
