@@ -24,9 +24,9 @@ export function BottomSheet(props: BottomSheetProps) {
   return (
     <>
       {createPortal(
-        <div
-          class="fixed inset-0 z-50 flex flex-col justify-end lg:hidden"
-          role="dialog"
+        <dialog
+          open
+          class="fixed inset-0 z-50 m-0 p-0 w-full h-full max-w-none max-h-none bg-transparent border-0 flex flex-col justify-end lg:hidden"
           aria-modal="true"
           aria-labelledby={titleId}
         >
@@ -50,7 +50,7 @@ export function BottomSheet(props: BottomSheetProps) {
             </div>
             <div class="flex-1 overflow-y-auto p-4">{props.children}</div>
           </div>
-        </div>,
+        </dialog>,
         portalRoot,
       )}
     </>

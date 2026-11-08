@@ -151,14 +151,15 @@ export class InventoryService implements InventoryServiceContract {
         const qtyAfter = qtyBefore + qtyChange
         const incomingCost = input.unitCost ?? product.costPrice
 
-        const weightedAvgCost =
-          input.unitCost !== undefined
-            ? qtyBefore > 0
+        let weightedAvgCost: number | undefined
+        if (input.unitCost !== undefined) {
+          weightedAvgCost =
+            qtyBefore > 0
               ? Math.round(
                   (qtyBefore * product.costPrice + qtyChange * incomingCost) / qtyAfter,
                 )
               : incomingCost
-            : undefined
+        }
 
         return this.deps.stockMovementRepo.applyMovementAtomically({
           productId: product.id,

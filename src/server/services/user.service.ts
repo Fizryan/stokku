@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { UserRole } from '../../shared/constants.js'
 import type {
   CreateUserInput,
   ResetUserPasswordInput,
@@ -62,6 +63,65 @@ export class UserService implements UserServiceContract {
     return created
   }
 
+  private assertCanModifyUser(
+    actorId: number,
+    target: UserDTO,
+    nextRole: UserRole,
+    nextIsActive: boolean,
+  ): void {
+    if (actorId === target.id && !nextIsActive) {
+      throw AppError.badRequest(
+        'Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.',
+      )
+    }
+
+    const losingOwnerPrivilege =
+      target.role === 'OWNER' &&
+      target.isActive &&
+      (nextRole !== 'OWNER' || !nextIsActive)
+
+    if (losingOwnerPrivilege && this.deps.userRepo.countActiveOwners() <= 1) {
+      throw AppError.badRequest('Sistem wajib memiliki minimal satu akun Owner aktif.')
+    }
+  }
+
+  private logUserUpdateAudits(
+    actor: UserDTO,
+    target: UserDTO,
+    nextRole: UserRole,
+    nextIsActive: boolean,
+  ): void {
+    if (!this.deps.auditService) return
+
+    if (nextRole !== target.role) {
+      this.deps.auditService.log({
+        actor,
+        actionType: 'USER_ROLE_CHANGED',
+        resourceType: 'user',
+        resourceId: target.id,
+        details: {
+          targetUserId: target.id,
+          username: target.username,
+          oldRole: target.role,
+          newRole: nextRole,
+        },
+      })
+    }
+
+    if (nextIsActive !== target.isActive) {
+      this.deps.auditService.log({
+        actor,
+        actionType: nextIsActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        resourceType: 'user',
+        resourceId: target.id,
+        details: {
+          targetUserId: target.id,
+          username: target.username,
+        },
+      })
+    }
+  }
+
   public updateUser(
     actor: UserDTO,
     targetUserId: number,
@@ -77,20 +137,7 @@ export class UserService implements UserServiceContract {
       const nextRole = input.role ?? target.role
       const nextIsActive = input.isActive ?? target.isActive
 
-      if (actor.id === target.id && !nextIsActive) {
-        throw AppError.badRequest(
-          'Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.',
-        )
-      }
-
-      const losingOwnerPrivilege =
-        target.role === 'OWNER' &&
-        target.isActive &&
-        (nextRole !== 'OWNER' || !nextIsActive)
-
-      if (losingOwnerPrivilege && this.deps.userRepo.countActiveOwners() <= 1) {
-        throw AppError.badRequest('Sistem wajib memiliki minimal satu akun Owner aktif.')
-      }
+      this.assertCanModifyUser(actor.id, target, nextRole, nextIsActive)
 
       const updated = this.deps.userRepo.updateProfile({
         id: target.id,
@@ -108,35 +155,7 @@ export class UserService implements UserServiceContract {
         this.deps.sessionRepo.deleteAllForUser(target.id)
       }
 
-      if (this.deps.auditService) {
-        if (nextRole !== target.role) {
-          this.deps.auditService.log({
-            actor,
-            actionType: 'USER_ROLE_CHANGED',
-            resourceType: 'user',
-            resourceId: target.id,
-            details: {
-              targetUserId: target.id,
-              username: target.username,
-              oldRole: target.role,
-              newRole: nextRole,
-            },
-          })
-        }
-
-        if (nextIsActive !== target.isActive) {
-          this.deps.auditService.log({
-            actor,
-            actionType: nextIsActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
-            resourceType: 'user',
-            resourceId: target.id,
-            details: {
-              targetUserId: target.id,
-              username: target.username,
-            },
-          })
-        }
-      }
+      this.logUserUpdateAudits(actor, target, nextRole, nextIsActive)
 
       return updated
     })

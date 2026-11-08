@@ -409,7 +409,7 @@ export class SaleRepository {
     if (filter.search) {
       const escaped = `%${escapeSqlLikePattern(filter.search)}%`
       conditions.push(
-        "(s.invoice_number LIKE ? ESCAPE '\\' OR COALESCE(s.customer_name, '') LIKE ? ESCAPE '\\')",
+        String.raw`(s.invoice_number LIKE ? ESCAPE '\' OR COALESCE(s.customer_name, '') LIKE ? ESCAPE '\')`,
       )
       params.push(escaped.toUpperCase(), escaped)
     }

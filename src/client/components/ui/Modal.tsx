@@ -29,9 +29,9 @@ export function Modal(props: ModalProps) {
   return (
     <>
       {createPortal(
-        <div
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-          role="dialog"
+        <dialog
+          open
+          class="fixed inset-0 z-50 m-0 p-4 sm:p-6 w-full h-full max-w-none max-h-none bg-transparent border-0 flex items-center justify-center"
           aria-modal="true"
           aria-labelledby={titleId}
         >
@@ -74,7 +74,7 @@ export function Modal(props: ModalProps) {
               </div>
             )}
           </div>
-        </div>,
+        </dialog>,
         portalRoot,
       )}
     </>

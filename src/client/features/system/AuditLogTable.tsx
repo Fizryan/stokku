@@ -44,6 +44,125 @@ const ACTION_TYPE_OPTIONS: readonly SelectOption[] = [
   })),
 ]
 
+function formatDetailValue(val: unknown): string {
+  if (val === null || val === undefined) {
+    return '-'
+  }
+  if (typeof val === 'string') {
+    return val
+  }
+  if (typeof val === 'number' || typeof val === 'boolean' || typeof val === 'bigint') {
+    return val.toString()
+  }
+  return JSON.stringify(val)
+}
+
+interface AuditLogTableContentProps {
+  readonly loading: boolean
+  readonly logs: readonly AuditLogDTO[]
+}
+
+function AuditLogTableContent({ loading, logs }: AuditLogTableContentProps) {
+  if (loading && logs.length === 0) {
+    return (
+      <div class="p-12 text-center text-m3-on-surface-variant">
+        <IconRefresh class="w-6 h-6 animate-spin mx-auto mb-2 text-m3-primary" />
+        <p class="text-xs">Memuat catatan log audit...</p>
+      </div>
+    )
+  }
+
+  if (logs.length === 0) {
+    return (
+      <EmptyState
+        icon={<IconShield />}
+        title="Tidak Ada Catatan Log"
+        description="Tidak ada aktivitas yang sesuai dengan kriteria filter yang dipilih."
+      />
+    )
+  }
+
+  return (
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-m3-on-surface">
+        <thead class="bg-m3-surface-container text-m3-on-surface-variant border-b border-m3-outline-variant/60">
+          <tr>
+            <th class="p-3.5 font-semibold">Waktu</th>
+            <th class="p-3.5 font-semibold">Aktor / Pengguna</th>
+            <th class="p-3.5 font-semibold">Jenis Peristiwa</th>
+            <th class="p-3.5 font-semibold">Entitas Target</th>
+            <th class="p-3.5 font-semibold">Rincian Perubahan (Details)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-m3-outline-variant/40">
+          {logs.map((log) => (
+            <tr
+              key={log.id}
+              class="hover:bg-m3-surface-container-low/50 transition-colors"
+            >
+              <td class="p-3.5 whitespace-nowrap text-m3-on-surface-variant font-mono text-[11px]">
+                <div class="flex items-center gap-1.5">
+                  <IconClock class="w-3.5 h-3.5 text-m3-on-surface-variant/70 shrink-0" />
+                  <span>{formatDateTime(log.createdAt)}</span>
+                </div>
+              </td>
+
+              <td class="p-3.5 whitespace-nowrap">
+                {log.actorName ? (
+                  <div>
+                    <div class="font-bold text-m3-on-surface">{log.actorName}</div>
+                    {log.actorRole && (
+                      <div class="mt-0.5">
+                        <Badge tone="neutral" class="text-[10px] px-1.5 py-0.2">
+                          {ROLE_LABELS[log.actorRole] ?? log.actorRole}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span class="text-m3-on-surface-variant italic">
+                    Sistem / Background
+                  </span>
+                )}
+              </td>
+
+              <td class="p-3.5 whitespace-nowrap">
+                <Badge tone={getAuditBadgeTone(log.actionType)}>
+                  {AUDIT_ACTION_TYPE_LABELS[log.actionType] ?? log.actionType}
+                </Badge>
+              </td>
+
+              <td class="p-3.5 whitespace-nowrap">
+                <span class="font-mono text-m3-on-surface bg-m3-surface-container px-2 py-0.5 rounded-lg border border-m3-outline-variant/60 text-[11px] font-semibold">
+                  {log.resourceType}
+                  {log.resourceId ? ` #${log.resourceId}` : ''}
+                </span>
+              </td>
+
+              <td class="p-3.5 text-m3-on-surface max-w-md break-words">
+                {log.details ? (
+                  <div class="bg-m3-surface-container/60 rounded-xl p-2.5 border border-m3-outline-variant/40 text-[11px] font-mono space-y-1">
+                    {Object.entries(log.details).map(([key, val]) => (
+                      <div key={key} class="flex items-start gap-1.5">
+                        <span class="text-m3-on-surface-variant">{key}:</span>
+                        <span class="text-m3-on-surface font-sans font-medium">
+                          {formatDetailValue(val)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span class="text-m3-on-surface-variant/60">-</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function AuditLogTable() {
   const { showToast } = useToast()
   const [logs, setLogs] = useState<readonly AuditLogDTO[]>([])
@@ -173,98 +292,7 @@ export function AuditLogTable() {
           </span>
         </div>
 
-        {loading && logs.length === 0 ? (
-          <div class="p-12 text-center text-m3-on-surface-variant">
-            <IconRefresh class="w-6 h-6 animate-spin mx-auto mb-2 text-m3-primary" />
-            <p class="text-xs">Memuat catatan log audit...</p>
-          </div>
-        ) : logs.length === 0 ? (
-          <EmptyState
-            icon={<IconShield />}
-            title="Tidak Ada Catatan Log"
-            description="Tidak ada aktivitas yang sesuai dengan kriteria filter yang dipilih."
-          />
-        ) : (
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-m3-on-surface">
-              <thead class="bg-m3-surface-container text-m3-on-surface-variant border-b border-m3-outline-variant/60">
-                <tr>
-                  <th class="p-3.5 font-semibold">Waktu</th>
-                  <th class="p-3.5 font-semibold">Aktor / Pengguna</th>
-                  <th class="p-3.5 font-semibold">Jenis Peristiwa</th>
-                  <th class="p-3.5 font-semibold">Entitas Target</th>
-                  <th class="p-3.5 font-semibold">Rincian Perubahan (Details)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-m3-outline-variant/40">
-                {logs.map((log) => (
-                  <tr
-                    key={log.id}
-                    class="hover:bg-m3-surface-container-low/50 transition-colors"
-                  >
-                    <td class="p-3.5 whitespace-nowrap text-m3-on-surface-variant font-mono text-[11px]">
-                      <div class="flex items-center gap-1.5">
-                        <IconClock class="w-3.5 h-3.5 text-m3-on-surface-variant/70 shrink-0" />
-                        <span>{formatDateTime(log.createdAt)}</span>
-                      </div>
-                    </td>
-
-                    <td class="p-3.5 whitespace-nowrap">
-                      {log.actorName ? (
-                        <div>
-                          <div class="font-bold text-m3-on-surface">{log.actorName}</div>
-                          {log.actorRole && (
-                            <div class="mt-0.5">
-                              <Badge tone="neutral" class="text-[10px] px-1.5 py-0.2">
-                                {ROLE_LABELS[log.actorRole] ?? log.actorRole}
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span class="text-m3-on-surface-variant italic">
-                          Sistem / Background
-                        </span>
-                      )}
-                    </td>
-
-                    <td class="p-3.5 whitespace-nowrap">
-                      <Badge tone={getAuditBadgeTone(log.actionType)}>
-                        {AUDIT_ACTION_TYPE_LABELS[log.actionType] ?? log.actionType}
-                      </Badge>
-                    </td>
-
-                    <td class="p-3.5 whitespace-nowrap">
-                      <span class="font-mono text-m3-on-surface bg-m3-surface-container px-2 py-0.5 rounded-lg border border-m3-outline-variant/60 text-[11px] font-semibold">
-                        {log.resourceType}
-                        {log.resourceId ? ` #${log.resourceId}` : ''}
-                      </span>
-                    </td>
-
-                    <td class="p-3.5 text-m3-on-surface max-w-md break-words">
-                      {log.details ? (
-                        <div class="bg-m3-surface-container/60 rounded-xl p-2.5 border border-m3-outline-variant/40 text-[11px] font-mono space-y-1">
-                          {Object.entries(log.details).map(([key, val]) => (
-                            <div key={key} class="flex items-start gap-1.5">
-                              <span class="text-m3-on-surface-variant">{key}:</span>
-                              <span class="text-m3-on-surface font-sans font-medium">
-                                {typeof val === 'object'
-                                  ? JSON.stringify(val)
-                                  : String(val)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span class="text-m3-on-surface-variant/60">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <AuditLogTableContent loading={loading} logs={logs} />
 
         {meta.totalPages > 1 && (
           <div class="p-3 border-t border-m3-outline-variant/60">

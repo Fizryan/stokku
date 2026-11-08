@@ -25,6 +25,18 @@ export function trimmedNullableString(maxLen = 255) {
     })
 }
 
+export function trimmedNullableEmail(maxLen = 120) {
+  return z.preprocess(
+    (val) => (typeof val === 'string' && val.trim().length === 0 ? null : val),
+    z
+      .email('Format alamat email tidak valid.')
+      .trim()
+      .max(maxLen, `Maksimal ${maxLen} karakter.`)
+      .nullable()
+      .optional(),
+  )
+}
+
 export function nonNegativeMoneySchema(label: string) {
   return z
     .number({ error: `${label} harus berupa angka bulat.` })

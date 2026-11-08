@@ -340,7 +340,7 @@ export function PurchasesPage() {
 
       {/* Main Content Table */}
       <Card class="border border-m3-outline-variant overflow-hidden">
-        {loading ? (
+        {loading && (
           <div class="p-12 text-center">
             <div
               class="w-8 h-8 rounded-full border-3 border-m3-primary border-t-transparent animate-spin mx-auto"
@@ -350,7 +350,9 @@ export function PurchasesPage() {
               Memuat data faktur pembelian...
             </p>
           </div>
-        ) : purchases.length === 0 ? (
+        )}
+
+        {!loading && purchases.length === 0 && (
           <div class="p-8">
             <EmptyState
               icon={<IconTruck class="w-10 h-10 text-m3-on-surface-variant" />}
@@ -365,7 +367,9 @@ export function PurchasesPage() {
               }
             />
           </div>
-        ) : (
+        )}
+
+        {!loading && purchases.length > 0 && (
           <div>
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs">

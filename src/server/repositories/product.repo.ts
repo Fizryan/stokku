@@ -214,7 +214,7 @@ export class ProductRepository {
     if (query.search) {
       const escaped = `%${escapeSqlLikePattern(query.search)}%`
       conditions.push(
-        "(p.name LIKE ? ESCAPE '\\' OR p.sku LIKE ? ESCAPE '\\' OR COALESCE(p.barcode, '') LIKE ? ESCAPE '\\')",
+        String.raw`(p.name LIKE ? ESCAPE '\' OR p.sku LIKE ? ESCAPE '\' OR COALESCE(p.barcode, '') LIKE ? ESCAPE '\')`,
       )
       params.push(escaped, escaped.toUpperCase(), escaped)
     }

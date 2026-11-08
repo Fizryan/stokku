@@ -20,6 +20,58 @@ export interface StockMovementModalProps {
 
 type ManualType = 'IN_PURCHASE' | 'ADJUSTMENT_OPNAME' | 'OUT_DAMAGED'
 
+function computeProjectedStock(
+  type: ManualType,
+  currentStock: number,
+  qty: number,
+  actual: number,
+): number {
+  if (type === 'IN_PURCHASE') return currentStock + qty
+  if (type === 'OUT_DAMAGED') return currentStock - qty
+  return actual
+}
+
+function getDeltaToneClass(projectedStock: number, projectedDelta: number): string {
+  if (projectedStock < 0) return 'text-m3-danger'
+  if (projectedDelta > 0) return 'text-m3-success'
+  if (projectedDelta < 0) return 'text-m3-warning'
+  return ''
+}
+
+function buildMovementPayload(
+  productId: number,
+  movementType: ManualType,
+  parsedQty: number,
+  parsedActual: number,
+  unitCost: number,
+  updateCostFlag: boolean,
+  note: string,
+): RecordStockMovementInput {
+  if (movementType === 'IN_PURCHASE') {
+    return {
+      productId,
+      movementType: 'IN_PURCHASE',
+      quantity: parsedQty,
+      ...(updateCostFlag ? { unitCost } : {}),
+      note: note.trim() || null,
+    }
+  }
+  if (movementType === 'OUT_DAMAGED') {
+    return {
+      productId,
+      movementType: 'OUT_DAMAGED',
+      quantity: parsedQty,
+      note: note.trim(),
+    }
+  }
+  return {
+    productId,
+    movementType: 'ADJUSTMENT_OPNAME',
+    actualStockQty: parsedActual,
+    note: note.trim(),
+  }
+}
+
 export function StockMovementModal(props: StockMovementModalProps) {
   const { showToast } = useToast()
 
@@ -55,12 +107,12 @@ export function StockMovementModal(props: StockMovementModalProps) {
   const parsedActual = parseDigitsToInt(actualStockStr)
 
   const currentStock = selectedProduct?.stockQty ?? 0
-  const projectedStock =
-    movementType === 'IN_PURCHASE'
-      ? currentStock + parsedQty
-      : movementType === 'OUT_DAMAGED'
-        ? currentStock - parsedQty
-        : parsedActual
+  const projectedStock = computeProjectedStock(
+    movementType,
+    currentStock,
+    parsedQty,
+    parsedActual,
+  )
 
   const projectedDelta = projectedStock - currentStock
 
@@ -80,30 +132,15 @@ export function StockMovementModal(props: StockMovementModalProps) {
     setSaving(true)
 
     try {
-      let payload: RecordStockMovementInput
-      if (movementType === 'IN_PURCHASE') {
-        payload = {
-          productId: selectedProduct.id,
-          movementType: 'IN_PURCHASE',
-          quantity: parsedQty,
-          ...(updateCostFlag ? { unitCost } : {}),
-          note: note.trim() || null,
-        }
-      } else if (movementType === 'OUT_DAMAGED') {
-        payload = {
-          productId: selectedProduct.id,
-          movementType: 'OUT_DAMAGED',
-          quantity: parsedQty,
-          note: note.trim(),
-        }
-      } else {
-        payload = {
-          productId: selectedProduct.id,
-          movementType: 'ADJUSTMENT_OPNAME',
-          actualStockQty: parsedActual,
-          note: note.trim(),
-        }
-      }
+      const payload = buildMovementPayload(
+        selectedProduct.id,
+        movementType,
+        parsedQty,
+        parsedActual,
+        unitCost,
+        updateCostFlag,
+        note,
+      )
 
       await api.inventory.recordMovement(payload)
       showToast('Mutasi stok berhasil dicatat ke Kartu Stok.', 'success')
@@ -261,17 +298,7 @@ export function StockMovementModal(props: StockMovementModalProps) {
             <span class="text-m3-on-surface-variant">Pratinjau Saldo Stok:</span>
             <span class="font-semibold text-m3-on-surface">
               {formatInteger(currentStock)} →{' '}
-              <span
-                class={
-                  projectedStock < 0
-                    ? 'text-m3-danger'
-                    : projectedDelta > 0
-                      ? 'text-m3-success'
-                      : projectedDelta < 0
-                        ? 'text-m3-warning'
-                        : ''
-                }
-              >
+              <span class={getDeltaToneClass(projectedStock, projectedDelta)}>
                 {formatInteger(projectedStock)} {selectedProduct.unit}
               </span>{' '}
               ({projectedDelta >= 0 ? `+${projectedDelta}` : projectedDelta})

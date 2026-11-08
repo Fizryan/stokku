@@ -32,6 +32,26 @@ import { useToast } from '../../stores/toast.store.js'
 import { ReceiptModal } from './ReceiptModal.js'
 import { VoidSaleModal } from './VoidSaleModal.js'
 
+function SaleGrossProfitCell({
+  status,
+  grossProfitAmount,
+}: {
+  readonly status: SaleStatus
+  readonly grossProfitAmount: number | null
+}) {
+  if (status === 'VOIDED' || grossProfitAmount === null) {
+    return <span class="text-m3-on-surface-variant">—</span>
+  }
+  const isPositive = grossProfitAmount >= 0
+  return (
+    <span
+      class={isPositive ? 'font-medium text-m3-success' : 'font-medium text-m3-danger'}
+    >
+      {formatRupiah(grossProfitAmount)}
+    </span>
+  )
+}
+
 export function SalesHistoryPage() {
   const { can, refreshSession } = useAuth()
   const { showToast } = useToast()
@@ -267,17 +287,21 @@ export function SalesHistoryPage() {
           />
         </div>
 
-        {loading && !salesData ? (
+        {loading && !salesData && (
           <div class="py-12 text-center text-xs text-m3-on-surface-variant">
             Memuat riwayat penjualan...
           </div>
-        ) : sales.length === 0 ? (
+        )}
+
+        {!loading && sales.length === 0 && (
           <EmptyState
             icon={<IconReceipt />}
             title="Belum ada transaksi yang sesuai"
             description="Transaksi kasir (POS) yang selesai maupun dibatalkan akan tampil secara kronologis di halaman ini."
           />
-        ) : (
+        )}
+
+        {sales.length > 0 && (
           <>
             {/* Desktop Table */}
             <div class="hidden md:block overflow-x-auto">
@@ -334,21 +358,10 @@ export function SalesHistoryPage() {
                       </td>
                       {canSeeFinancials && (
                         <td class="py-3 px-3 text-right tabular-nums">
-                          {sale.status === 'VOIDED' ? (
-                            <span class="text-m3-on-surface-variant">—</span>
-                          ) : sale.grossProfitAmount !== null ? (
-                            <span
-                              class={
-                                sale.grossProfitAmount >= 0
-                                  ? 'font-medium text-m3-success'
-                                  : 'font-medium text-m3-danger'
-                              }
-                            >
-                              {formatRupiah(sale.grossProfitAmount)}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
+                          <SaleGrossProfitCell
+                            status={sale.status}
+                            grossProfitAmount={sale.grossProfitAmount}
+                          />
                         </td>
                       )}
                       <td class="py-3 px-3 text-center">
