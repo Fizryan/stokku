@@ -4,6 +4,7 @@ import type {
   PaginatedResult,
   ProductDTO,
   PurchaseDetailDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   ReplenishmentRecommendationDTO,
   StockMovementDTO,
@@ -259,6 +260,53 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
       ),
     )
 
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    harness.db
+      .prepare('UPDATE purchases SET due_date = ? WHERE id = ?')
+      .run(today, purchase.id)
+
+    const dueTodaySummary = await warehouseClient.requestJson<PurchasePayablesSummaryDTO>(
+      '/api/purchases/payables-summary',
+    )
+    assert(dueTodaySummary.body.ok)
+    assert.equal(dueTodaySummary.body.data.unpaidCount, 1)
+    assert.equal(dueTodaySummary.body.data.unpaidAmount, 620_000)
+    assert.equal(dueTodaySummary.body.data.dueTodayCount, 1)
+
+    const dueTodayList = await warehouseClient.requestJson<
+      PaginatedResult<PurchaseSummaryDTO>
+    >('/api/purchases?dueStatus=DUE_TODAY')
+    assert(dueTodayList.body.ok)
+    assert.equal(dueTodayList.body.data.items[0]?.id, purchase.id)
+
+    harness.db
+      .prepare('UPDATE purchases SET due_date = ? WHERE id = ?')
+      .run(yesterday, purchase.id)
+    const overdueSummary = await warehouseClient.requestJson<PurchasePayablesSummaryDTO>(
+      '/api/purchases/payables-summary',
+    )
+    assert(overdueSummary.body.ok)
+    assert.equal(overdueSummary.body.data.overdueCount, 1)
+    assert.equal(overdueSummary.body.data.overdueAmount, 620_000)
+    const overdueList = await warehouseClient.requestJson<
+      PaginatedResult<PurchaseSummaryDTO>
+    >('/api/purchases?dueStatus=OVERDUE')
+    assert(overdueList.body.ok)
+    assert.equal(overdueList.body.data.items[0]?.id, purchase.id)
+
+    harness.db
+      .prepare('UPDATE purchases SET due_date = NULL WHERE id = ?')
+      .run(purchase.id)
+    const noDueDateSummary =
+      await warehouseClient.requestJson<PurchasePayablesSummaryDTO>(
+        '/api/purchases/payables-summary',
+      )
+    assert(noDueDateSummary.body.ok)
+    assert.equal(noDueDateSummary.body.data.unpaidCount, 1)
+    assert.equal(noDueDateSummary.body.data.overdueCount, 0)
+    assert.equal(noDueDateSummary.body.data.dueTodayCount, 0)
+
     // 7. Verify Product A Stock and Weighted-Average HPP
     const updatedProdA = await ownerClient.requestJson<ProductDTO>(
       `/api/products/${prodA.id}`,
@@ -323,6 +371,13 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
     assert.equal(settleRes.status, 200)
     assert(settleRes.body.ok)
     assert.equal(settleRes.body.data.paymentStatus, 'PAID')
+
+    const settledSummary = await warehouseClient.requestJson<PurchasePayablesSummaryDTO>(
+      '/api/purchases/payables-summary',
+    )
+    assert(settledSummary.body.ok)
+    assert.equal(settledSummary.body.data.unpaidCount, 0)
+    assert.equal(settledSummary.body.data.unpaidAmount, 0)
 
     // 11. Query Purchases with Filter (paymentStatus = PAID)
     const paidListRes = await warehouseClient.requestJson<

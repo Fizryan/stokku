@@ -31,6 +31,7 @@ export type {
   ProductDTO,
   PurchaseDetailDTO,
   PurchaseItemDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   ReplenishmentRecommendationDTO,
   SaleDetailDTO,

@@ -5,6 +5,7 @@ import type {
   PaginatedResult,
   PurchaseDetailDTO,
   PurchaseItemDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
 } from '../../shared/types.js'
 import {
@@ -295,6 +296,38 @@ export class PurchaseRepository {
     return Number(res.changes) === 1
   }
 
+  public getPayablesSummary(today: string): PurchasePayablesSummaryDTO {
+    const row = this.db
+      .prepare(`
+        SELECT
+          COUNT(*) AS unpaid_count,
+          COALESCE(SUM(subtotal_amount), 0) AS unpaid_amount,
+          SUM(CASE WHEN due_date < ? THEN 1 ELSE 0 END) AS overdue_count,
+          COALESCE(SUM(CASE WHEN due_date < ? THEN subtotal_amount ELSE 0 END), 0) AS overdue_amount,
+          SUM(CASE WHEN due_date = ? THEN 1 ELSE 0 END) AS due_today_count,
+          COALESCE(SUM(CASE WHEN due_date = ? THEN subtotal_amount ELSE 0 END), 0) AS due_today_amount
+        FROM purchases
+        WHERE payment_status = 'UNPAID'
+      `)
+      .get(today, today, today, today) as {
+      unpaid_count: number
+      unpaid_amount: number
+      overdue_count: number | null
+      overdue_amount: number
+      due_today_count: number | null
+      due_today_amount: number
+    }
+
+    return {
+      unpaidCount: row.unpaid_count,
+      unpaidAmount: row.unpaid_amount,
+      overdueCount: row.overdue_count ?? 0,
+      overdueAmount: row.overdue_amount,
+      dueTodayCount: row.due_today_count ?? 0,
+      dueTodayAmount: row.due_today_amount,
+    }
+  }
+
   public listPaginated(query: PurchasesQueryInput): PaginatedResult<PurchaseSummaryDTO> {
     const conditions: string[] = []
     const params: SQLInputValue[] = []
@@ -307,6 +340,14 @@ export class PurchaseRepository {
     if (query.paymentStatus) {
       conditions.push('p.payment_status = ?')
       params.push(query.paymentStatus)
+    }
+
+    if (query.dueStatus === 'OVERDUE') {
+      conditions.push("p.payment_status = 'UNPAID' AND p.due_date < ?")
+      params.push(new Date().toISOString().slice(0, 10))
+    } else if (query.dueStatus === 'DUE_TODAY') {
+      conditions.push("p.payment_status = 'UNPAID' AND p.due_date = ?")
+      params.push(new Date().toISOString().slice(0, 10))
     }
 
     if (query.search) {

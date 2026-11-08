@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import { getPointExpiryIso } from '../../shared/constants.js'
 import type {
   AdjustCustomerPointsInput,
   CreateCustomerInput,
@@ -116,21 +117,22 @@ export class CustomerService implements CustomerServiceContract {
       throw AppError.notFound(`Pelanggan dengan ID #${customerId} tidak ditemukan.`)
     }
 
-    if (customer.pointsBalance + input.points < 0) {
-      throw AppError.badRequest(
-        `Pengurangan ${Math.abs(input.points)} poin melebihi saldo pelanggan (${customer.pointsBalance} poin).`,
-      )
-    }
-
     const nowIso = new Date().toISOString()
 
     runInImmediateTransaction(this.db, () => {
-      const ok = this.customerRepo.adjustBalanceInTx(customerId, input.points)
-      if (!ok) {
-        throw AppError.conflict('Gagal memperbarui saldo poin pelanggan.')
+      this.customerRepo.expirePointsInTx(customerId, actor.id, nowIso)
+      const current = this.customerRepo.findById(customerId)
+      if (!current) {
+        throw AppError.notFound(`Pelanggan dengan ID #${customerId} tidak ditemukan.`)
+      }
+      if (current.pointsBalance + input.points < 0) {
+        throw AppError.badRequest(
+          `Pengurangan ${Math.abs(input.points)} poin melebihi saldo pelanggan (${current.pointsBalance} poin).`,
+        )
       }
 
-      this.customerRepo.recordPointMutationInTx({
+      const expiresAt = input.points > 0 ? getPointExpiryIso(new Date(nowIso)) : null
+      const mutationId = this.customerRepo.recordPointMutationInTx({
         customerId,
         points: input.points,
         mutationType: 'ADJUSTMENT',
@@ -139,7 +141,35 @@ export class CustomerService implements CustomerServiceContract {
         description: input.description.trim(),
         actorUserId: actor.id,
         nowIso,
+        expiresAt,
       })
+
+      if (input.points < 0) {
+        const consumed = this.customerRepo.consumePointsInTx(
+          customerId,
+          Math.abs(input.points),
+          mutationId,
+          nowIso,
+        )
+        if (!consumed) {
+          throw AppError.conflict('Gagal menggunakan lot poin pelanggan.')
+        }
+      } else {
+        if (!expiresAt) {
+          throw new Error('Poin positif harus memiliki tanggal kedaluwarsa.')
+        }
+        this.customerRepo.createPointLotInTx({
+          customerId,
+          sourceMutationId: mutationId,
+          points: input.points,
+          expiresAt,
+        })
+      }
+
+      const ok = this.customerRepo.adjustBalanceInTx(customerId, input.points)
+      if (!ok) {
+        throw AppError.conflict('Gagal memperbarui saldo poin pelanggan.')
+      }
     })
 
     const updated = this.customerRepo.findById(customerId)

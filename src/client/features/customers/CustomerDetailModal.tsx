@@ -103,7 +103,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
   const [mutations, setMutations] = useState<readonly CustomerPointMutationDTO[]>([])
   const [loadingMutations, setLoadingMutations] = useState(false)
 
-  // Points adjustment form state
   const [showAdjustForm, setShowAdjustForm] = useState(false)
   const [adjustPointsValue, setAdjustPointsValue] = useState('')
   const [adjustDescription, setAdjustDescription] = useState('')
@@ -185,7 +184,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
       }
     >
       <div class="space-y-4">
-        {/* Top 3 Stat Cards */}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card class="p-3 bg-m3-surface-container-low border border-m3-outline-variant">
             <div class="flex items-center gap-1.5 text-xs text-m3-on-surface-variant font-medium">
@@ -232,7 +230,23 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           </Card>
         </div>
 
-        {/* Identity & Contact Details */}
+        <Card class="p-3 bg-m3-surface-container-low border border-m3-outline-variant">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-xs text-m3-on-surface-variant font-medium">Tier Loyalitas</p>
+              <p class="text-lg font-bold text-m3-primary mt-0.5">
+                {customer.loyaltyTier.name}
+              </p>
+            </div>
+            <Badge tone="success">
+              Bonus poin {customer.loyaltyTier.bonusPointsPercent}%
+            </Badge>
+          </div>
+          <p class="text-[11px] text-m3-on-surface-variant mt-1">
+            {customer.loyaltyTier.reason}
+          </p>
+        </Card>
+
         <div class="p-3 bg-m3-surface-container-low border border-m3-outline-variant rounded-xl text-xs grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
             <span class="text-m3-on-surface-variant">No. Telepon / WhatsApp:</span>
@@ -260,7 +274,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           )}
         </div>
 
-        {/* Owner Points Adjustment Action */}
         {isOwner && (
           <div class="border border-m3-outline-variant rounded-xl p-3 bg-m3-surface-container-low/40">
             <div class="flex items-center justify-between">
@@ -329,7 +342,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           </div>
         )}
 
-        {/* Mutation Ledger History */}
         <div>
           <div class="flex items-center justify-between mb-2">
             <h4 class="text-xs font-bold text-m3-on-surface-variant uppercase tracking-wider">
@@ -347,7 +359,65 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           </div>
 
           <div class="overflow-x-auto rounded-xl border border-m3-outline-variant">
-            <PointMutationsContent loading={loadingMutations} mutations={mutations} />
+            {loadingMutations ? (
+              <div class="p-6 text-center text-xs text-m3-on-surface-variant">
+                Memuat riwayat mutasi poin...
+              </div>
+            ) : mutations.length === 0 ? (
+              <div class="p-6 text-center text-xs text-m3-on-surface-variant">
+                Belum ada aktivitas mutasi poin untuk pelanggan ini.
+              </div>
+            ) : (
+              <table class="w-full text-left text-xs">
+                <thead class="bg-m3-surface-container text-m3-on-surface-variant font-semibold">
+                  <tr>
+                    <th class="py-2.5 px-3">Waktu</th>
+                    <th class="py-2.5 px-3">Jenis Mutasi</th>
+                    <th class="py-2.5 px-3 text-right">Poin</th>
+                    <th class="py-2.5 px-3">Keterangan</th>
+                    <th class="py-2.5 px-3">Berlaku hingga</th>
+                    <th class="py-2.5 px-3">Operator</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-m3-outline-variant">
+                  {mutations.map((m) => {
+                    const isPositive = m.points > 0
+                    return (
+                      <tr key={m.id} class="hover:bg-m3-surface-container-low/50">
+                        <td class="py-2 px-3 text-m3-on-surface whitespace-nowrap">
+                          {formatDateTime(m.createdAt)}
+                        </td>
+                        <td class="py-2 px-3">
+                          <Badge tone={isPositive ? 'success' : 'warning'}>
+                            {POINT_MUTATION_TYPE_LABELS[m.mutationType]}
+                          </Badge>
+                        </td>
+                        <td class="py-2 px-3 text-right font-bold whitespace-nowrap">
+                          <span
+                            class={
+                              isPositive
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-amber-600 dark:text-amber-400'
+                            }
+                          >
+                            {isPositive
+                              ? `+${formatInteger(m.points)}`
+                              : formatInteger(m.points)}
+                          </span>
+                        </td>
+                        <td class="py-2 px-3 text-m3-on-surface">{m.description}</td>
+                        <td class="py-2 px-3 text-m3-on-surface-variant whitespace-nowrap">
+                          {m.expiresAt ? formatDateTime(m.expiresAt) : '-'}
+                        </td>
+                        <td class="py-2 px-3 text-m3-on-surface-variant whitespace-nowrap">
+                          {m.actorName}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

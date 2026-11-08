@@ -47,6 +47,7 @@ import type {
   PaymentMethod,
   ProductDTO,
   PurchaseDetailDTO,
+  PurchasePayablesSummaryDTO,
   PurchasePaymentStatus,
   PurchaseSummaryDTO,
   ReplenishmentRecommendationDTO,
@@ -514,7 +515,12 @@ export const api = {
     },
   },
 
-  purchases: {
+    purchases: {
+    getPayablesSummary(signal?: AbortSignal): Promise<PurchasePayablesSummaryDTO> {
+      return unwrapApiResponse<PurchasePayablesSummaryDTO>(
+        rpcClient.api.purchases['payables-summary'].$get({}, { init: { signal } }),
+      )
+    },
     recommendations(
       supplierId?: number,
     ): Promise<readonly ReplenishmentRecommendationDTO[]> {
@@ -535,6 +541,7 @@ export const api = {
       params: {
         supplierId?: number
         paymentStatus?: PurchasePaymentStatus
+        dueStatus?: 'OVERDUE' | 'DUE_TODAY'
         search?: string
         dateFrom?: string
         dateTo?: string
@@ -550,6 +557,7 @@ export const api = {
               supplierId:
                 params.supplierId !== undefined ? String(params.supplierId) : undefined,
               paymentStatus: params.paymentStatus,
+              dueStatus: params.dueStatus,
               search: params.search || undefined,
               dateFrom: params.dateFrom || undefined,
               dateTo: params.dateTo || undefined,

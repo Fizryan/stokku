@@ -13,6 +13,7 @@ import {
 import type {
   PaginationMeta,
   PurchaseDetailDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   SupplierDTO,
 } from '../../../shared/types.js'
@@ -40,6 +41,8 @@ export function PurchasesPage() {
   const canManageSuppliers = can('suppliers:manage')
 
   const [purchases, setPurchases] = useState<readonly PurchaseSummaryDTO[]>([])
+  const [payablesSummary, setPayablesSummary] =
+    useState<PurchasePayablesSummaryDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [suppliers, setSuppliers] = useState<readonly SupplierDTO[]>([])
 
@@ -47,6 +50,7 @@ export function PurchasesPage() {
   const [search, setSearch] = useState('')
   const [supplierIdFilter, setSupplierIdFilter] = useState<string>('')
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('')
+  const [dueStatusFilter, setDueStatusFilter] = useState<string>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
@@ -95,26 +99,43 @@ export function PurchasesPage() {
     ]
   }, [])
 
+  const dueStatusOptions = useMemo<readonly SelectOption[]>(
+    () => [
+      { value: '', label: 'Semua Jatuh Tempo' },
+      { value: 'OVERDUE', label: 'Sudah Terlambat' },
+      { value: 'DUE_TODAY', label: 'Jatuh Tempo Hari Ini' },
+    ],
+    [],
+  )
+
   const loadPurchases = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true)
       try {
-        const res = await api.purchases.list(
-          {
-            search: search.trim() || undefined,
-            supplierId: supplierIdFilter ? Number(supplierIdFilter) : undefined,
-            paymentStatus: (paymentStatusFilter || undefined) as
-              | PurchasePaymentStatus
-              | undefined,
-            dateFrom: dateFrom || undefined,
-            dateTo: dateTo || undefined,
-            page,
-            pageSize: 20,
-          },
-          signal,
-        )
+        const [res, summary] = await Promise.all([
+          api.purchases.list(
+            {
+              search: search.trim() || undefined,
+              supplierId: supplierIdFilter ? Number(supplierIdFilter) : undefined,
+              paymentStatus: (paymentStatusFilter || undefined) as
+                | PurchasePaymentStatus
+                | undefined,
+              dueStatus: (dueStatusFilter || undefined) as
+                | 'OVERDUE'
+                | 'DUE_TODAY'
+                | undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+              page,
+              pageSize: 20,
+            },
+            signal,
+          ),
+          api.purchases.getPayablesSummary(signal),
+        ])
         setPurchases(res.items)
         setMeta(res.meta)
+        setPayablesSummary(summary)
       } catch (err) {
         if (signal?.aborted || isAbortError(err)) return
         showToast(
@@ -129,7 +150,16 @@ export function PurchasesPage() {
         }
       }
     },
-    [search, supplierIdFilter, paymentStatusFilter, dateFrom, dateTo, page, showToast],
+    [
+      search,
+      supplierIdFilter,
+      paymentStatusFilter,
+      dueStatusFilter,
+      dateFrom,
+      dateTo,
+      page,
+      showToast,
+    ],
   )
 
   useEffect(() => {
@@ -159,6 +189,7 @@ export function PurchasesPage() {
     setSearch('')
     setSupplierIdFilter('')
     setPaymentStatusFilter('')
+    setDueStatusFilter('')
     setDateFrom('')
     setDateTo('')
     setPage(1)
@@ -167,22 +198,12 @@ export function PurchasesPage() {
   // Aggregate Stats on Current Loaded List
   const stats = useMemo(() => {
     let totalPurchases = 0
-    let totalDebt = 0
-    let unpaidCount = 0
 
     for (const p of purchases) {
       totalPurchases += p.subtotalAmount
-      if (p.paymentStatus === 'UNPAID') {
-        totalDebt += p.subtotalAmount
-        unpaidCount += 1
-      }
     }
 
-    return {
-      totalPurchases,
-      totalDebt,
-      unpaidCount,
-    }
+    return { totalPurchases }
   }, [purchases])
 
   return (
@@ -228,7 +249,7 @@ export function PurchasesPage() {
       </div>
 
       {/* Aggregate Stat Cards */}
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <Card class="p-4 border border-m3-outline-variant bg-m3-surface-container-low">
           <p class="text-xs font-medium text-m3-on-surface-variant">
             Total Faktur Tercatat
@@ -252,23 +273,59 @@ export function PurchasesPage() {
             Dari {purchases.length} transaksi ditampilkan
           </p>
         </Card>
+      </div>
 
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card class="p-4 border border-m3-outline-variant bg-m3-surface-container-low">
           <p class="text-xs font-medium text-m3-on-surface-variant">
-            Hutang / Tempo Aktif (Halaman Ini)
+            Total Tagihan Belum Lunas
           </p>
           <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-            {formatRupiah(stats.totalDebt)}
+            {payablesSummary ? formatRupiah(payablesSummary.unpaidAmount) : '—'}
           </p>
           <p class="text-[11px] text-m3-on-surface-variant mt-1">
-            {stats.unpaidCount} faktur belum lunas
+            {payablesSummary?.unpaidCount ?? '—'} faktur
           </p>
+        </Card>
+        <Card class="p-4 border border-m3-outline-variant bg-m3-surface-container-low">
+          <p class="text-xs font-medium text-m3-on-surface-variant">Tagihan Terlambat</p>
+          <p class="text-2xl font-bold text-m3-danger mt-1">
+            {payablesSummary ? formatRupiah(payablesSummary.overdueAmount) : '—'}
+          </p>
+          <button
+            type="button"
+            class="text-[11px] text-m3-primary mt-1 hover:underline cursor-pointer"
+            onClick={() => {
+              setDueStatusFilter('OVERDUE')
+              setPage(1)
+            }}
+          >
+            Lihat {payablesSummary?.overdueCount ?? '—'} faktur terlambat
+          </button>
+        </Card>
+        <Card class="p-4 border border-m3-outline-variant bg-m3-surface-container-low">
+          <p class="text-xs font-medium text-m3-on-surface-variant">
+            Jatuh Tempo Hari Ini
+          </p>
+          <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+            {payablesSummary ? formatRupiah(payablesSummary.dueTodayAmount) : '—'}
+          </p>
+          <button
+            type="button"
+            class="text-[11px] text-m3-primary mt-1 hover:underline cursor-pointer"
+            onClick={() => {
+              setDueStatusFilter('DUE_TODAY')
+              setPage(1)
+            }}
+          >
+            Lihat {payablesSummary?.dueTodayCount ?? '—'} faktur hari ini
+          </button>
         </Card>
       </div>
 
       {/* Filters Toolbar */}
       <Card class="p-4 border border-m3-outline-variant">
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
           <div class="sm:col-span-2 md:col-span-1">
             <TextField
               label="Cari Faktur / Supplier"
@@ -306,6 +363,18 @@ export function PurchasesPage() {
           </div>
 
           <div>
+            <SelectField
+              label="Status Jatuh Tempo"
+              value={dueStatusFilter}
+              options={dueStatusOptions}
+              onValueChange={(val) => {
+                setDueStatusFilter(val)
+                setPage(1)
+              }}
+            />
+          </div>
+
+          <div>
             <TextField
               label="Dari Tanggal"
               type="date"
@@ -330,7 +399,12 @@ export function PurchasesPage() {
           </div>
         </div>
 
-        {(search || supplierIdFilter || paymentStatusFilter || dateFrom || dateTo) && (
+        {(search ||
+          supplierIdFilter ||
+          paymentStatusFilter ||
+          dueStatusFilter ||
+          dateFrom ||
+          dateTo) && (
           <div class="mt-3 pt-3 border-t border-m3-outline-variant flex items-center justify-between text-xs">
             <span class="text-m3-on-surface-variant">Filter aktif diterapkan</span>
             <Button variant="ghost" size="sm" onClick={handleResetFilters}>
@@ -391,6 +465,9 @@ export function PurchasesPage() {
                 <tbody class="divide-y divide-m3-outline-variant">
                   {purchases.map((p) => {
                     const isUnpaid = p.paymentStatus === 'UNPAID'
+                    const today = new Date().toISOString().slice(0, 10)
+                    const isOverdue = isUnpaid && p.dueDate !== null && p.dueDate < today
+                    const dueToday = isUnpaid && p.dueDate === today
                     return (
                       <tr
                         key={p.id}
@@ -410,15 +487,19 @@ export function PurchasesPage() {
                         </td>
                         <td class="py-3 px-4">
                           {p.dueDate ? (
-                            <span
-                              class={
-                                isUnpaid
-                                  ? 'font-semibold text-amber-600 dark:text-amber-400'
-                                  : 'text-m3-on-surface-variant'
-                              }
-                            >
-                              {formatDateShort(p.dueDate)}
-                            </span>
+                            <div class="space-y-1">
+                              <span
+                                class={
+                                  isUnpaid
+                                    ? 'font-semibold text-amber-600 dark:text-amber-400'
+                                    : 'text-m3-on-surface-variant'
+                                }
+                              >
+                                {formatDateShort(p.dueDate)}
+                              </span>
+                              {isOverdue && <Badge tone="warning">Terlambat</Badge>}
+                              {dueToday && <Badge tone="warning">Hari ini</Badge>}
+                            </div>
                           ) : (
                             <span class="text-m3-on-surface-variant">-</span>
                           )}
