@@ -9,9 +9,11 @@ import { CustomerRepository } from './repositories/customer.repo.js'
 import { DashboardRepository } from './repositories/dashboard.repo.js'
 import { ProductRepository } from './repositories/product.repo.js'
 import { PurchaseRepository } from './repositories/purchase.repo.js'
+import { ReplenishmentRepository } from './repositories/replenishment.repo.js'
 import { SaleRepository } from './repositories/sale.repo.js'
 import { SessionRepository } from './repositories/session.repo.js'
 import { ShiftRepository } from './repositories/shift.repo.js'
+import { StockBatchRepository } from './repositories/stock-batch.repo.js'
 import { StockMovementRepository } from './repositories/stock-movement.repo.js'
 import { SupplierRepository } from './repositories/supplier.repo.js'
 import { UserRepository } from './repositories/user.repo.js'
@@ -44,10 +46,12 @@ export function createAppContainer(config: ServerConfig): AppContainer {
   const categoryRepo = new CategoryRepository(db)
   const productRepo = new ProductRepository(db)
   const stockMovementRepo = new StockMovementRepository(db)
+  const stockBatchRepo = new StockBatchRepository(db)
   const shiftRepo = new ShiftRepository(db)
   const saleRepo = new SaleRepository(db)
   const supplierRepo = new SupplierRepository(db)
   const purchaseRepo = new PurchaseRepository(db)
+  const replenishmentRepo = new ReplenishmentRepository(db)
   const customerRepo = new CustomerRepository(db)
   const dashboardRepo = new DashboardRepository(db)
   const auditRepo = new AuditRepository(db)
@@ -81,11 +85,21 @@ export function createAppContainer(config: ServerConfig): AppContainer {
     backupDir: config.backupDir,
     auditService,
   })
+  const scheduledBackupInterval = setInterval(() => {
+    if (!db.isOpen) return
+    try {
+      backupService.runScheduledBackupIfDue()
+    } catch (error) {
+      console.error('Scheduled database backup failed.', error)
+    }
+  }, 60 * 1000)
+  scheduledBackupInterval.unref()
 
   const inventoryService = new InventoryService({
     db,
     productRepo,
     stockMovementRepo,
+    stockBatchRepo,
     auditService,
   })
 
@@ -127,7 +141,8 @@ export function createAppContainer(config: ServerConfig): AppContainer {
     purchaseRepo,
     supplierRepo,
     productRepo,
-    stockMovementRepo,
+    inventoryService,
+    replenishmentRepo,
   })
 
   const reportService = new ReportService({
@@ -188,6 +203,7 @@ export function createAppContainer(config: ServerConfig): AppContainer {
     if (disposed) return
     disposed = true
     clearInterval(sessionPruneInterval)
+    clearInterval(scheduledBackupInterval)
     loginRateLimiter.dispose()
     closeDatabaseGracefully(db)
   }
