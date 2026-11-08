@@ -98,6 +98,7 @@ function makeMockSale(overrides: Partial<SaleDetailDTO> = {}): SaleDetailDTO {
     totalQty: 1,
     subtotalAmount: 10_000,
     discountAmount: 0,
+    taxAmount: 0,
     totalAmount: 10_000,
     grossProfitAmount: null,
     paymentMethod: 'CASH',

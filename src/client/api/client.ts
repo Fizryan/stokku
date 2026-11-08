@@ -47,6 +47,7 @@ import type {
   PaymentMethod,
   ProductDTO,
   PurchaseDetailDTO,
+  ReplenishmentRecommendationDTO,
   PurchasePaymentStatus,
   PurchaseSummaryDTO,
   ReplenishmentRecommendationDTO,
@@ -580,6 +581,11 @@ export const api = {
           json: input,
         }),
       )
+    },
+    recommendations(supplierId: number, signal?: AbortSignal): Promise<readonly ReplenishmentRecommendationDTO[]> {
+      throw new Error('Not implemented')
+      void supplierId
+      void signal
     },
   },
 

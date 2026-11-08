@@ -16,6 +16,7 @@ interface RawSupplierRow {
   notes: string | null
   lead_time_days: number
   is_active: number
+  lead_time_days: number
   created_at: string
 }
 
@@ -29,6 +30,7 @@ function mapSupplierRow(row: RawSupplierRow): SupplierDTO {
     notes: row.notes,
     leadTimeDays: row.lead_time_days,
     isActive: Boolean(row.is_active),
+    leadTimeDays: row.lead_time_days,
     createdAt: row.created_at,
   }
 }

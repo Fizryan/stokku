@@ -222,6 +222,20 @@ export interface CurrentShiftStatusDTO {
   readonly shift: CashShiftDetailDTO | null
 }
 
+export interface ReplenishmentRecommendationDTO {
+  readonly productId: number
+  readonly sku: string
+  readonly productName: string
+  readonly unit: string
+  readonly stockQty: number
+  readonly minStockQty: number
+  readonly avgDailySales: number
+  readonly recommendedQty: number
+  readonly leadTimeDays: number
+  readonly supplierId: number | null
+  readonly supplierName: string | null
+}
+
 export interface SupplierDTO {
   readonly id: number
   readonly name: string
@@ -231,6 +245,7 @@ export interface SupplierDTO {
   readonly notes: string | null
   readonly leadTimeDays: number
   readonly isActive: boolean
+  readonly leadTimeDays: number
   readonly createdAt: string
 }
 
