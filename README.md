@@ -1,5 +1,8 @@
 # Stokku — Sistem Manajemen Stok, Kasir & Pengadaan Terpadu
 
+[![CI](https://github.com/Fizryan/stokku/actions/workflows/ci.yml/badge.svg)](https://github.com/Fizryan/stokku/actions/workflows/ci.yml)
+[![Release](https://github.com/Fizryan/stokku/actions/workflows/release.yml/badge.svg)](https://github.com/Fizryan/stokku/actions/workflows/release.yml)
+
 Aplikasi web _fullstack_ terintegrasi untuk manajemen inventaris, buku besar stok (_immutable ledger_), kasir (_Point of Sale_), manajemen shift kasir, pengadaan supplier, loyalitas pelanggan, audit trail, dan pemulihan bencana (_disaster recovery_). Dibangun di atas fondasi teknologi **Node.js LTS (`node:sqlite` mode WAL)**, **Hono**, **Zod v4**, **Vite 8**, dan **Tailwind CSS v4** dengan filosofi antarmuka **Material 3 Calm Sapphire Blue**.
 
 ---
@@ -140,6 +143,22 @@ docker compose up -d --build
 
 # Periksa status kontainer dan healthcheck
 docker compose ps
+```
+
+### Menjalankan Image Resmi dari GitHub Container Registry (GHCR)
+
+Setiap rilis versi dan commit pada branch `master` otomatis dipublikasikan ke **GHCR** sebagai image multi-arsitektur (`linux/amd64` & `linux/arm64`):
+
+```bash
+# Tarik image produksi terbaru dari GHCR
+docker pull ghcr.io/fizryan/stokku:latest
+
+# Jalankan container dengan persistent volume SQLite
+docker run -d \
+  --name stokku-app \
+  -p 3000:3000 \
+  -v stokku_sqlite_data:/data \
+  ghcr.io/fizryan/stokku:latest
 ```
 
 Aplikasi aktif pada port `http://localhost:3000`. Database dan berkas cadangan disimpan secara persisten di Docker volume `stokku_sqlite_data` pada path container `/data`.
