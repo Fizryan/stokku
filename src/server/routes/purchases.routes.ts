@@ -3,6 +3,7 @@ import {
   createPurchaseSchema,
   idParamSchema,
   purchasesQuerySchema,
+  replenishmentQuerySchema,
   updatePurchasePaymentStatusSchema,
 } from '../../shared/schemas/index.js'
 import type { AppServices, HonoAppEnv } from '../contracts/services.contract.js'
@@ -23,6 +24,16 @@ export function createPurchasesRoutes(services: AppServices) {
 
   return new Hono<HonoAppEnv>()
     .use('*', requireAuth)
+    .get('/recommendations', canView, validateQuery(replenishmentQuerySchema), (c) => {
+      const { supplierId } = c.req.valid('query')
+      return c.json(
+        {
+          ok: true as const,
+          data: services.purchases.getReplenishmentRecommendations(supplierId),
+        },
+        200,
+      )
+    })
     .get('/', canView, validateQuery(purchasesQuerySchema), (c) => {
       const query = c.req.valid('query')
       const result = services.purchases.listPurchases(query)

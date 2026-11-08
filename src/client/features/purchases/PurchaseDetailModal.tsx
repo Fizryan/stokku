@@ -164,6 +164,7 @@ export function PurchaseDetailModal(props: PurchaseDetailModalProps) {
                   <th class="py-2.5 px-3">Produk / SKU</th>
                   <th class="py-2.5 px-3 text-right">Jumlah (Qty)</th>
                   <th class="py-2.5 px-3 text-right">Harga Beli Satuan</th>
+                  <th class="py-2.5 px-3 text-center">Kedaluwarsa</th>
                   <th class="py-2.5 px-3 text-right">Subtotal</th>
                 </tr>
               </thead>
@@ -183,6 +184,9 @@ export function PurchaseDetailModal(props: PurchaseDetailModalProps) {
                     </td>
                     <td class="py-2 px-3 text-right text-m3-on-surface">
                       {formatRupiah(item.unitCost)}
+                    </td>
+                    <td class="py-2 px-3 text-center text-m3-on-surface-variant">
+                      {item.expiryDate ?? 'Tidak dicatat'}
                     </td>
                     <td class="py-2 px-3 text-right font-bold text-m3-on-surface">
                       {formatRupiah(item.lineSubtotal)}

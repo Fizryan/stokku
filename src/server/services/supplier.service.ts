@@ -43,10 +43,11 @@ export class SupplierService implements SupplierServiceContract {
     const id = runInImmediateTransaction(this.deps.db, () => {
       return this.deps.supplierRepo.create({
         name: input.name,
-        contactPerson: input.contactPerson,
-        phone: input.phone,
-        address: input.address,
-        notes: input.notes,
+        contactPerson: input.contactPerson ?? null,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        notes: input.notes ?? null,
+        leadTimeDays: input.leadTimeDays ?? 7,
         nowIso,
       })
     })
@@ -67,10 +68,11 @@ export class SupplierService implements SupplierServiceContract {
     runInImmediateTransaction(this.deps.db, () => {
       const ok = this.deps.supplierRepo.update(id, {
         name: input.name,
-        contactPerson: input.contactPerson,
-        phone: input.phone,
-        address: input.address,
-        notes: input.notes,
+        contactPerson: input.contactPerson ?? null,
+        phone: input.phone ?? null,
+        address: input.address ?? null,
+        notes: input.notes ?? null,
+        leadTimeDays: input.leadTimeDays ?? existing.leadTimeDays,
         isActive: input.isActive,
       })
       if (!ok) {

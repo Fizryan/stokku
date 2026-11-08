@@ -30,6 +30,7 @@ import { useAuth } from '../../stores/auth.store.js'
 import { useToast } from '../../stores/toast.store.js'
 import { PurchaseDetailModal } from './PurchaseDetailModal.js'
 import { PurchaseInvoiceModal } from './PurchaseInvoiceModal.js'
+import { ReplenishmentPanel } from './ReplenishmentPanel.js'
 import { SupplierManagerModal } from './SupplierManagerModal.js'
 
 export function PurchasesPage() {
@@ -219,6 +220,8 @@ export function PurchasesPage() {
             pelacakan hutang tempo supplier.
           </p>
         </div>
+
+        <ReplenishmentPanel suppliers={suppliers} />
 
         <div class="flex items-center gap-2">
           {canManageSuppliers && (

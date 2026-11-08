@@ -12,12 +12,14 @@ import type {
 import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
 import type { ProductRecord, ProductRepository } from '../repositories/product.repo.js'
+import type { StockBatchRepository } from '../repositories/stock-batch.repo.js'
 import type { StockMovementRepository } from '../repositories/stock-movement.repo.js'
 
 export interface InventoryServiceDeps {
   readonly db: DatabaseSync
   readonly productRepo: ProductRepository
   readonly stockMovementRepo: StockMovementRepository
+  readonly stockBatchRepo: StockBatchRepository
   readonly auditService?: AuditServiceContract
 }
 
@@ -49,7 +51,7 @@ export class InventoryService implements InventoryServiceContract {
       return null
     }
 
-    return this.deps.stockMovementRepo.applyMovementAtomically({
+    const movement = this.deps.stockMovementRepo.applyMovementAtomically({
       productId: params.product.id,
       movementType: 'INITIAL',
       qtyBefore: 0,
@@ -63,6 +65,66 @@ export class InventoryService implements InventoryServiceContract {
       nowIso: params.nowIso,
       includeUnitCostInResult: params.includeUnitCostInResult,
     })
+    this.deps.stockBatchRepo.addBatch({
+      productId: params.product.id,
+      sourceType: 'INITIAL',
+      sourceId: params.product.id,
+      qty: params.initialStock,
+      expiryDate: null,
+      unitCost: params.product.costPrice,
+      createdAt: params.nowIso,
+    })
+    return movement
+  }
+
+  public listExpiringStock(withinDays = 30) {
+    return this.deps.stockBatchRepo.listExpiring(withinDays, new Date().toISOString())
+  }
+
+  public recordPurchaseStockInTx(params: {
+    product: ProductRecord
+    qty: number
+    unitCost: number
+    purchaseId: number
+    invoiceNumber: string
+    expiryDate: string | null
+    actorUserId: number
+    nowIso: string
+  }): StockMovementDTO {
+    const qtyAfter = params.product.stockQty + params.qty
+    const weightedAvgCost =
+      params.product.stockQty > 0
+        ? Math.round(
+            (params.product.stockQty * params.product.costPrice +
+              params.qty * params.unitCost) /
+              qtyAfter,
+          )
+        : params.unitCost
+    const movement = this.deps.stockMovementRepo.applyMovementAtomically({
+      productId: params.product.id,
+      movementType: 'IN_PURCHASE',
+      qtyBefore: params.product.stockQty,
+      qtyChange: params.qty,
+      qtyAfter,
+      unitCostSnapshot: params.unitCost,
+      newProductCostPrice: weightedAvgCost,
+      referenceType: 'MANUAL',
+      referenceId: params.purchaseId,
+      note: `Faktur Pembelian: ${params.invoiceNumber}`,
+      actorUserId: params.actorUserId,
+      nowIso: params.nowIso,
+      includeUnitCostInResult: true,
+    })
+    this.deps.stockBatchRepo.addBatch({
+      productId: params.product.id,
+      sourceType: 'PURCHASE',
+      sourceId: params.purchaseId,
+      qty: params.qty,
+      expiryDate: params.expiryDate,
+      unitCost: params.unitCost,
+      createdAt: params.nowIso,
+    })
+    return movement
   }
 
   /**
@@ -81,9 +143,15 @@ export class InventoryService implements InventoryServiceContract {
         `Stok produk "${params.product.name}" (${params.product.sku}) tidak mencukupi. Tersisa ${params.product.stockQty} ${params.product.unit}, diminta ${params.qty} ${params.product.unit}.`,
       )
     }
+    const sellableQty = this.deps.stockBatchRepo.getSellableQty(params.product.id)
+    if (sellableQty < params.qty) {
+      throw AppError.insufficientStock(
+        `Stok produk "${params.product.name}" (${params.product.sku}) yang belum kedaluwarsa tidak mencukupi. Tersedia ${sellableQty} ${params.product.unit}, diminta ${params.qty} ${params.product.unit}.`,
+      )
+    }
 
     const qtyAfter = params.product.stockQty - params.qty
-    return this.deps.stockMovementRepo.applyMovementAtomically({
+    const movement = this.deps.stockMovementRepo.applyMovementAtomically({
       productId: params.product.id,
       movementType: 'OUT_SALE',
       qtyBefore: params.product.stockQty,
@@ -97,6 +165,12 @@ export class InventoryService implements InventoryServiceContract {
       nowIso: params.nowIso,
       includeUnitCostInResult: false,
     })
+    this.deps.stockBatchRepo.consume({
+      productId: params.product.id,
+      qty: params.qty,
+      saleId: params.saleId,
+    })
+    return movement
   }
 
   /**
@@ -111,7 +185,7 @@ export class InventoryService implements InventoryServiceContract {
     nowIso: string
   }): StockMovementDTO {
     const qtyAfter = params.product.stockQty + params.qty
-    return this.deps.stockMovementRepo.applyMovementAtomically({
+    const movement = this.deps.stockMovementRepo.applyMovementAtomically({
       productId: params.product.id,
       movementType: 'VOID_REVERSAL',
       qtyBefore: params.product.stockQty,
@@ -125,6 +199,22 @@ export class InventoryService implements InventoryServiceContract {
       nowIso: params.nowIso,
       includeUnitCostInResult: true,
     })
+    const restoredQty = this.deps.stockBatchRepo.restoreSaleAllocations(
+      params.saleId,
+      params.product.id,
+    )
+    if (restoredQty < params.qty) {
+      this.deps.stockBatchRepo.addBatch({
+        productId: params.product.id,
+        sourceType: 'LEGACY',
+        sourceId: params.saleId,
+        qty: params.qty - restoredQty,
+        expiryDate: null,
+        unitCost: params.product.costPrice,
+        createdAt: params.nowIso,
+      })
+    }
+    return movement
   }
 
   public recordManualMovement(
@@ -161,7 +251,7 @@ export class InventoryService implements InventoryServiceContract {
               : incomingCost
         }
 
-        return this.deps.stockMovementRepo.applyMovementAtomically({
+        const movement = this.deps.stockMovementRepo.applyMovementAtomically({
           productId: product.id,
           movementType: 'IN_PURCHASE',
           qtyBefore,
@@ -176,6 +266,16 @@ export class InventoryService implements InventoryServiceContract {
           nowIso,
           includeUnitCostInResult: includeCost,
         })
+        this.deps.stockBatchRepo.addBatch({
+          productId: product.id,
+          sourceType: 'MANUAL',
+          sourceId: null,
+          qty: input.quantity,
+          expiryDate: null,
+          unitCost: incomingCost,
+          createdAt: nowIso,
+        })
+        return movement
       }
 
       if (input.movementType === 'OUT_DAMAGED') {
@@ -188,7 +288,7 @@ export class InventoryService implements InventoryServiceContract {
         const qtyChange = -input.quantity
         const qtyAfter = qtyBefore + qtyChange
 
-        return this.deps.stockMovementRepo.applyMovementAtomically({
+        const movement = this.deps.stockMovementRepo.applyMovementAtomically({
           productId: product.id,
           movementType: 'OUT_DAMAGED',
           qtyBefore,
@@ -202,6 +302,11 @@ export class InventoryService implements InventoryServiceContract {
           nowIso,
           includeUnitCostInResult: includeCost,
         })
+        this.deps.stockBatchRepo.consume({
+          productId: product.id,
+          qty: input.quantity,
+        })
+        return movement
       }
 
       const qtyBefore = product.stockQty
@@ -214,7 +319,7 @@ export class InventoryService implements InventoryServiceContract {
         )
       }
 
-      return this.deps.stockMovementRepo.applyMovementAtomically({
+      const movement = this.deps.stockMovementRepo.applyMovementAtomically({
         productId: product.id,
         movementType: 'ADJUSTMENT_OPNAME',
         qtyBefore,
@@ -228,6 +333,23 @@ export class InventoryService implements InventoryServiceContract {
         nowIso,
         includeUnitCostInResult: includeCost,
       })
+      if (qtyChange < 0) {
+        this.deps.stockBatchRepo.consume({
+          productId: product.id,
+          qty: -qtyChange,
+        })
+      } else {
+        this.deps.stockBatchRepo.addBatch({
+          productId: product.id,
+          sourceType: 'MANUAL',
+          sourceId: null,
+          qty: qtyChange,
+          expiryDate: null,
+          unitCost: product.costPrice,
+          createdAt: nowIso,
+        })
+      }
+      return movement
     })
 
     if (this.deps.auditService) {

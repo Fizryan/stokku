@@ -67,6 +67,9 @@ function SupplierListContent({
                 {s.isActive ? 'Aktif' : 'Arsip'}
               </Badge>
             </div>
+            <p class="text-[11px] text-m3-on-surface-variant mt-0.5">
+              Lead time: {s.leadTimeDays} hari
+            </p>
             {s.contactPerson && (
               <p class="text-[11px] text-m3-on-surface-variant mt-0.5">
                 Kontak: {s.contactPerson} {s.phone ? `(${s.phone})` : ''}
@@ -106,6 +109,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [leadTimeDays, setLeadTimeDays] = useState('7')
   const [isActive, setIsActive] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -137,6 +141,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
     setPhone('')
     setAddress('')
     setNotes('')
+    setLeadTimeDays('7')
     setIsActive(true)
     setErrorMessage(null)
   }
@@ -149,6 +154,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
     setPhone(s.phone ?? '')
     setAddress(s.address ?? '')
     setNotes(s.notes ?? '')
+    setLeadTimeDays(String(s.leadTimeDays))
     setIsActive(s.isActive)
     setErrorMessage(null)
   }
@@ -166,6 +172,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
           phone: phone.trim() || null,
           address: address.trim() || null,
           notes: notes.trim() || null,
+          leadTimeDays: Number(leadTimeDays),
           isActive,
         })
         showToast(`Supplier "${name.trim()}" berhasil diperbarui.`, 'success')
@@ -176,6 +183,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
           phone: phone.trim() || null,
           address: address.trim() || null,
           notes: notes.trim() || null,
+          leadTimeDays: Number(leadTimeDays),
         })
         showToast(`Supplier "${name.trim()}" berhasil ditambahkan.`, 'success')
       }
@@ -252,6 +260,15 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
               placeholder="Misal: PT Sumber Pangan Makmur"
               value={name}
               onValueChange={setName}
+              disabled={submitting}
+              required
+            />
+
+            <TextField
+              label="Estimasi Waktu Pengiriman (hari)"
+              type="number"
+              value={leadTimeDays}
+              onValueChange={setLeadTimeDays}
               disabled={submitting}
               required
             />

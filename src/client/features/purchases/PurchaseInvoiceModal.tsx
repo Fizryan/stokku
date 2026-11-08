@@ -24,6 +24,7 @@ interface ItemLine {
   productId: number | null
   qty: number
   unitCost: number
+  expiryDate: string
 }
 
 function createEmptyLine(): ItemLine {
@@ -32,6 +33,7 @@ function createEmptyLine(): ItemLine {
     productId: null,
     qty: 1,
     unitCost: 0,
+    expiryDate: '',
   }
 }
 
@@ -160,7 +162,12 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
       return
     }
 
-    const validItems: Array<{ productId: number; qty: number; unitCost: number }> = []
+    const validItems: Array<{
+      productId: number
+      qty: number
+      unitCost: number
+      expiryDate: string | null
+    }> = []
     for (let i = 0; i < items.length; i++) {
       const line = items[i]
       if (!line?.productId) {
@@ -175,6 +182,7 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
         productId: line.productId,
         qty: line.qty,
         unitCost: line.unitCost,
+        expiryDate: line.expiryDate || null,
       })
     }
 
@@ -318,9 +326,10 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
             <table class="w-full text-left text-xs text-m3-on-surface">
               <thead class="bg-m3-surface-container text-m3-on-surface-variant border-b border-m3-outline-variant/60">
                 <tr>
-                  <th class="p-3 font-semibold w-5/12">Pilih Produk</th>
-                  <th class="p-3 font-semibold text-center w-2/12">Jumlah Qty</th>
-                  <th class="p-3 font-semibold text-right w-3/12">Harga Beli Satuan</th>
+                  <th class="p-3 font-semibold w-4/12">Pilih Produk</th>
+                  <th class="p-3 font-semibold text-center w-1/12">Qty</th>
+                  <th class="p-3 font-semibold text-center w-2/12">Kedaluwarsa</th>
+                  <th class="p-3 font-semibold text-right w-2/12">Harga Satuan</th>
                   <th class="p-3 font-semibold text-right w-2/12">Subtotal</th>
                   <th class="p-3 font-semibold text-center w-1/12">Aksi</th>
                 </tr>
@@ -351,6 +360,24 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
                             </option>
                           ))}
                         </select>
+                      </td>
+
+                      <td class="p-2.5">
+                        <input
+                          type="date"
+                          aria-label={`Tanggal kedaluwarsa baris ${idx + 1}`}
+                          value={line.expiryDate}
+                          onInput={(e) => {
+                            const expiryDate = (e.currentTarget as HTMLInputElement).value
+                            setItems((prev) =>
+                              prev.map((item, i) =>
+                                i === idx ? { ...item, expiryDate } : item,
+                              ),
+                            )
+                          }}
+                          disabled={submitting}
+                          class="w-full h-9 px-2 rounded-xl bg-m3-surface-container-lowest border border-m3-outline-variant text-xs focus:outline-m3-primary"
+                        />
                       </td>
 
                       <td class="p-2.5 text-center">

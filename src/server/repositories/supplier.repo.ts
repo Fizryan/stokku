@@ -14,6 +14,7 @@ interface RawSupplierRow {
   phone: string | null
   address: string | null
   notes: string | null
+  lead_time_days: number
   is_active: number
   created_at: string
 }
@@ -26,6 +27,7 @@ function mapSupplierRow(row: RawSupplierRow): SupplierDTO {
     phone: row.phone,
     address: row.address,
     notes: row.notes,
+    leadTimeDays: row.lead_time_days,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
   }
@@ -49,10 +51,11 @@ export class SupplierRepository {
         phone,
         address,
         notes,
+        lead_time_days,
         is_active,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, 1, ?)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
     `)
 
     this.stmtUpdate = db.prepare(`
@@ -63,6 +66,7 @@ export class SupplierRepository {
         phone = ?,
         address = ?,
         notes = ?,
+        lead_time_days = ?,
         is_active = ?
       WHERE id = ?
     `)
@@ -93,6 +97,7 @@ export class SupplierRepository {
     phone: string | null
     address: string | null
     notes: string | null
+    leadTimeDays: number
     nowIso: string
   }): number {
     try {
@@ -102,6 +107,7 @@ export class SupplierRepository {
         params.phone,
         params.address,
         params.notes,
+        params.leadTimeDays,
         params.nowIso,
       )
       return Number(res.lastInsertRowid)
@@ -122,6 +128,7 @@ export class SupplierRepository {
       phone: string | null
       address: string | null
       notes: string | null
+      leadTimeDays: number
       isActive: boolean
     },
   ): boolean {
@@ -132,6 +139,7 @@ export class SupplierRepository {
         params.phone,
         params.address,
         params.notes,
+        params.leadTimeDays,
         params.isActive ? 1 : 0,
         id,
       )

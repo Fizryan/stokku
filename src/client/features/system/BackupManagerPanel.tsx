@@ -85,6 +85,10 @@ export function BackupManagerPanel() {
               transaksi kasir, tidak memerlukan restart aplikasi, dan menghasilkan file
               mandiri <code>.sqlite</code> yang siap dipulihkan kapan saja.
             </p>
+            <p class="text-xs text-m3-on-surface-variant">
+              Backup otomatis setiap hari pukul 02:00 waktu server. Snapshot diverifikasi
+              dengan SQLite integrity check; 30 backup terbaru dipertahankan.
+            </p>
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
@@ -164,6 +168,12 @@ export function BackupManagerPanel() {
                         <span class="font-mono font-medium text-m3-on-surface">
                           {b.fileName}
                         </span>
+                        <Badge tone={b.verified ? 'success' : 'warning'}>
+                          {b.verified ? 'Terverifikasi' : 'Belum diverifikasi'}
+                        </Badge>
+                        {b.mode === 'SCHEDULED' && (
+                          <Badge tone="neutral">Terjadwal</Badge>
+                        )}
                       </div>
                     </td>
 
