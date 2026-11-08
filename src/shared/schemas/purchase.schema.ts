@@ -12,15 +12,6 @@ import {
   trimmedRequiredString,
 } from './common.schema.js'
 
-export const purchaseItemInputSchema = z.object({
-  productId: z
-    .number({ error: 'ID produk tidak valid.' })
-    .int('ID produk harus bilangan bulat.')
-    .positive('ID produk tidak valid.'),
-  qty: positiveQtySchema('Jumlah kuantitas'),
-  unitCost: nonNegativeMoneySchema('Harga beli per satuan'),
-})
-
 export const nullableIsoDateField = z
   .string()
   .nullable()
@@ -32,6 +23,16 @@ export const nullableIsoDateField = z
   .refine((val) => val === null || /^\d{4}-\d{2}-\d{2}$/.test(val), {
     message: 'Format tanggal harus YYYY-MM-DD.',
   })
+
+export const purchaseItemInputSchema = z.object({
+  productId: z
+    .number({ error: 'ID produk tidak valid.' })
+    .int('ID produk harus bilangan bulat.')
+    .positive('ID produk tidak valid.'),
+  qty: positiveQtySchema('Jumlah kuantitas'),
+  unitCost: nonNegativeMoneySchema('Harga beli per satuan'),
+  expiryDate: nullableIsoDateField,
+})
 
 export const createPurchaseSchema = z.object({
   invoiceNumber: trimmedRequiredString('Nomor faktur / surat jalan supplier', 2, 60),
@@ -63,6 +64,10 @@ export const purchasesQuerySchema = z.object({
   dateFrom: optionalIsoDateQuery,
   dateTo: optionalIsoDateQuery,
   ...paginationQueryFields,
+})
+
+export const replenishmentQuerySchema = z.object({
+  supplierId: optionalPositiveIntQuery,
 })
 
 export type PurchaseItemInput = z.infer<typeof purchaseItemInputSchema>

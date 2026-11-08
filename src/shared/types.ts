@@ -229,6 +229,7 @@ export interface SupplierDTO {
   readonly phone: string | null
   readonly address: string | null
   readonly notes: string | null
+  readonly leadTimeDays: number
   readonly isActive: boolean
   readonly createdAt: string
 }
@@ -243,6 +244,31 @@ export interface PurchaseItemDTO {
   readonly qty: number
   readonly unitCost: number
   readonly lineSubtotal: number
+  readonly expiryDate: string | null
+}
+
+export interface ExpiringStockDTO {
+  readonly productId: number
+  readonly sku: string
+  readonly productName: string
+  readonly unit: string
+  readonly qty: number
+  readonly expiryDate: string
+  readonly daysUntilExpiry: number
+}
+
+export interface ReplenishmentRecommendationDTO {
+  readonly productId: number
+  readonly sku: string
+  readonly productName: string
+  readonly unit: string
+  readonly stockQty: number
+  readonly minStockQty: number
+  readonly avgDailySales: number
+  readonly recommendedQty: number
+  readonly leadTimeDays: number
+  readonly supplierId: number | null
+  readonly supplierName: string | null
 }
 
 export interface PurchaseSummaryDTO {
@@ -311,6 +337,8 @@ export interface BackupFileDTO {
   readonly fileSizeBytes: number
   readonly createdAt: string
   readonly downloadUrl: string
+  readonly verified?: boolean
+  readonly mode?: 'MANUAL' | 'SCHEDULED'
 }
 
 export interface CashRoundingResult {

@@ -33,6 +33,8 @@ Aplikasi web _fullstack_ terintegrasi untuk manajemen inventaris, buku besar sto
 - **Otomasi HPP Rata-Rata Tertimbang:** Saat barang diterima, sistem memperbarui HPP produk secara otomatis menggunakan rumus _weighted-average cost_:
   $$\text{HPP Baru} = \text{round}\left(\frac{(\text{Stok Lama} \times \text{HPP Lama}) + (\text{Qty Masuk} \times \text{Biaya Masuk})}{\text{Stok Akhir}}\right)$$
 - **Pencatatan Stok Atomik:** Menginput mutasi `IN_PURCHASE` langsung ke kartu stok produk secara simultan.
+- **Batch, Kedaluwarsa & FEFO:** Barang masuk dapat dicatat per tanggal kedaluwarsa. Checkout mengalokasikan batch bertanggal paling dekat lebih dahulu, menolak stok kedaluwarsa, dan void mengembalikan kuantitas ke batch asal. Stok lama dipertahankan sebagai batch tanpa tanggal.
+- **Rekomendasi Pengadaan:** Menyarankan jumlah restock dari penjualan 30 hari terakhir, stok minimum, stok yang masih layak jual, dan lead time supplier. Rumus targetnya: stok minimum + rata-rata penjualan harian × lead time − stok layak jual. Rekomendasi hanya sebagai saran—faktur tetap dibuat setelah dikonfirmasi pengguna.
 
 ### C. Pelanggan & Poin Loyalitas (Loyalty Rewards & Ledger)
 
@@ -60,6 +62,7 @@ Aplikasi web _fullstack_ terintegrasi untuk manajemen inventaris, buku besar sto
   - Ekspor berkas laporan penjualan CSV (`SALES_EXPORTED`).
   - Pembuatan cadangan database (`BACKUP_CREATED`).
 - **Live Database Backup Manager:** Pembuatan snapshot mandiri `.sqlite` secara live langsung dari halaman web Owner tanpa mematikan server.
+- **Backup Terjadwal & Terverifikasi:** Backup otomatis harian pukul 02:00 waktu server. Setiap snapshot menjalani `PRAGMA integrity_check`, riwayat dan mode backup dicatat, serta retensi menjaga 30 snapshot terbaru.
 - **Pencegahan Directory Traversal:** Validasi regex ketat pada nama berkas backup mencegah manipulasi jalur berkas.
 - **Runbook Pemulihan Bencana:** Dokumentasi prosedur penggantian database saat terjadi insiden perangkat keras.
 

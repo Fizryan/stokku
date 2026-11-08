@@ -10,6 +10,7 @@ import {
   formatRupiah,
 } from '../../../shared/formatters.js'
 import type {
+  ExpiringStockDTO,
   PaginatedResult,
   ProductDTO,
   StockMovementDTO,
@@ -46,6 +47,7 @@ export function InventoryPage() {
   const [movementsData, setMovementsData] =
     useState<PaginatedResult<StockMovementDTO> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [expiringStock, setExpiringStock] = useState<readonly ExpiringStockDTO[]>([])
 
   const [productIdFilter, setProductIdFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
@@ -103,6 +105,24 @@ export function InventoryPage() {
 
   useEffect(() => {
     const controller = new AbortController()
+    void api.inventory
+      .listExpiring(controller.signal)
+      .then(setExpiringStock)
+      .catch((err) => {
+        if (!isAbortError(err)) {
+          showToast(
+            err instanceof ClientApiError
+              ? err.message
+              : 'Gagal memuat stok mendekati kedaluwarsa.',
+            'error',
+          )
+        }
+      })
+    return () => controller.abort()
+  }, [showToast])
+
+  useEffect(() => {
+    const controller = new AbortController()
     void loadMovements(controller.signal)
     return () => controller.abort()
   }, [loadMovements])
@@ -123,6 +143,32 @@ export function InventoryPage() {
             rusak secara permanen.
           </p>
         </div>
+
+        {expiringStock.length > 0 && (
+          <Card class="p-4 border-m3-warning/40">
+            <h3 class="text-sm font-semibold text-m3-on-surface mb-2">
+              Batch mendekati / melewati kedaluwarsa (30 hari)
+            </h3>
+            <div class="divide-y divide-m3-outline-variant/50">
+              {expiringStock.map((batch) => (
+                <div
+                  key={`${batch.productId}-${batch.expiryDate}`}
+                  class="py-2 flex items-center justify-between gap-3 text-xs"
+                >
+                  <span class="font-medium">
+                    {batch.productName} · {batch.sku}
+                  </span>
+                  <span class="text-m3-on-surface-variant">
+                    {formatInteger(batch.qty)} {batch.unit} · {batch.expiryDate}
+                    {batch.daysUntilExpiry < 0
+                      ? ` (lewat ${Math.abs(batch.daysUntilExpiry)} hari)`
+                      : ` (${batch.daysUntilExpiry} hari lagi)`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {canManage && (
           <Button size="sm" onClick={() => setModalOpen(true)}>

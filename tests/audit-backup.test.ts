@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, it } from 'node:test'
+import { AuditRepository } from '../src/server/repositories/audit.repo.js'
+import { AuditService } from '../src/server/services/audit.service.js'
+import { BackupService } from '../src/server/services/backup.service.js'
 import type {
   AuditLogDTO,
   BackupFileDTO,
@@ -274,6 +277,27 @@ describe('Audit Trail & Disaster Recovery Backup Manager (Governance & Integrity
     assert(backupData.fileName.startsWith('stokku-backup-'))
     assert(backupData.fileName.endsWith('.sqlite'))
     assert(backupData.fileSizeBytes > 0)
+    assert.equal(backupData.verified, true)
+    assert.equal(backupData.mode, 'MANUAL')
+
+    const scheduledBackupService = new BackupService({
+      db: harness.db,
+      backupDir: tempBackupDir,
+      auditService: new AuditService({
+        auditRepo: new AuditRepository(harness.db),
+      }),
+    })
+    const scheduleTime = new Date()
+    scheduleTime.setHours(2, 0, 0, 0)
+    const scheduledBackup = scheduledBackupService.runScheduledBackupIfDue(scheduleTime)
+    assert(scheduledBackup)
+    assert.equal(scheduledBackup.mode, 'SCHEDULED')
+    assert.equal(scheduledBackup.verified, true)
+    assert.equal(
+      scheduledBackupService.runScheduledBackupIfDue(scheduleTime),
+      null,
+      'Only one scheduled snapshot should be created per local day.',
+    )
 
     // Verify BACKUP_CREATED audit log was recorded
     const backupAuditRes = await ownerClient.requestJson<PaginatedResult<AuditLogDTO>>(

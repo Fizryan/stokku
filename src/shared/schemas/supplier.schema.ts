@@ -12,11 +12,15 @@ export const createSupplierSchema = z.object({
   phone: trimmedNullableString(30),
   address: trimmedNullableString(255),
   notes: trimmedNullableString(255),
+  leadTimeDays: z.number().int().min(1).max(365).default(7),
 })
 
-export const updateSupplierSchema = createSupplierSchema.extend({
-  isActive: z.boolean({ error: 'Status aktif supplier harus berupa boolean.' }),
-})
+export const updateSupplierSchema = createSupplierSchema
+  .omit({ leadTimeDays: true })
+  .extend({
+    leadTimeDays: z.number().int().min(1).max(365).optional(),
+    isActive: z.boolean({ error: 'Status aktif supplier harus berupa boolean.' }),
+  })
 
 export const suppliersQuerySchema = z.object({
   search: optionalQueryText,
@@ -24,6 +28,6 @@ export const suppliersQuerySchema = z.object({
   ...paginationQueryFields,
 })
 
-export type CreateSupplierInput = z.infer<typeof createSupplierSchema>
-export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>
+export type CreateSupplierInput = z.input<typeof createSupplierSchema>
+export type UpdateSupplierInput = z.input<typeof updateSupplierSchema>
 export type SuppliersQueryInput = z.infer<typeof suppliersQuerySchema>

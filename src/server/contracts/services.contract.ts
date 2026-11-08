@@ -45,11 +45,13 @@ import type {
   CustomerDTO,
   CustomerPointMutationDTO,
   DashboardMetricsDTO,
+  ExpiringStockDTO,
   PaginatedResult,
   ProductDTO,
   PurchaseDetailDTO,
   PurchaseSummaryDTO,
   ReceiptVerificationResult,
+  ReplenishmentRecommendationDTO,
   SaleDetailDTO,
   SaleSummaryDTO,
   StockMovementDTO,
@@ -120,6 +122,7 @@ export interface InventoryServiceContract {
     actor: UserDTO,
     query: MovementQueryInput,
   ): PaginatedResult<StockMovementDTO>
+  listExpiringStock(withinDays?: number): readonly ExpiringStockDTO[]
 }
 
 export interface PosServiceContract {
@@ -162,6 +165,9 @@ export interface PurchaseServiceContract {
     id: number,
     input: UpdatePurchasePaymentStatusInput,
   ): PurchaseDetailDTO
+  getReplenishmentRecommendations(
+    supplierId?: number,
+  ): readonly ReplenishmentRecommendationDTO[]
 }
 
 export interface CustomerServiceContract {
@@ -202,6 +208,7 @@ export interface AuditServiceContract {
 
 export interface BackupServiceContract {
   createBackup(actor: UserDTO, meta?: SessionClientMetadata): BackupFileDTO
+  runScheduledBackupIfDue(now?: Date): BackupFileDTO | null
   listBackups(): readonly BackupFileDTO[]
   getBackupFilePath(fileName: string): string
   getBackupFileBuffer(fileName: string): Uint8Array

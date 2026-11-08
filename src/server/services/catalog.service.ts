@@ -124,7 +124,6 @@ export class CatalogService implements CatalogServiceContract {
           nowIso,
           includeUnitCostInResult: includeCost,
         })
-
         const reloaded = this.deps.productRepo.findById(created.id)
         if (!reloaded) {
           throw new Error('Failed to reload product after initial stock ledger entry.')

@@ -41,6 +41,7 @@ import type {
   CustomerDTO,
   CustomerPointMutationDTO,
   DashboardMetricsDTO,
+  ExpiringStockDTO,
   MovementType,
   PaginatedResult,
   PaymentMethod,
@@ -48,6 +49,7 @@ import type {
   PurchaseDetailDTO,
   PurchasePaymentStatus,
   PurchaseSummaryDTO,
+  ReplenishmentRecommendationDTO,
   SaleDetailDTO,
   SaleStatus,
   SaleSummaryDTO,
@@ -302,6 +304,11 @@ export const api = {
   },
 
   inventory: {
+    listExpiring(signal?: AbortSignal): Promise<readonly ExpiringStockDTO[]> {
+      return unwrapApiResponse<readonly ExpiringStockDTO[]>(
+        rpcClient.api.inventory.expiring.$get({}, { init: { signal } }),
+      )
+    },
     listMovements(
       params: {
         productId?: number
@@ -508,6 +515,17 @@ export const api = {
   },
 
   purchases: {
+    recommendations(
+      supplierId?: number,
+    ): Promise<readonly ReplenishmentRecommendationDTO[]> {
+      return unwrapApiResponse<readonly ReplenishmentRecommendationDTO[]>(
+        rpcClient.api.purchases.recommendations.$get({
+          query: {
+            supplierId: supplierId !== undefined ? String(supplierId) : undefined,
+          },
+        }),
+      )
+    },
     create(input: CreatePurchaseInput): Promise<PurchaseDetailDTO> {
       return unwrapApiResponse<PurchaseDetailDTO>(
         rpcClient.api.purchases.$post({ json: input }),
