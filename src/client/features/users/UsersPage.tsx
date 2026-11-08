@@ -106,17 +106,21 @@ export function UsersPage() {
       </div>
 
       <Card class="p-4 sm:p-5">
-        {loading && users.length === 0 ? (
+        {loading && users.length === 0 && (
           <div class="py-12 text-center text-xs text-m3-on-surface-variant">
             Memuat daftar pengguna...
           </div>
-        ) : users.length === 0 ? (
+        )}
+
+        {!loading && users.length === 0 && (
           <EmptyState
             icon={<IconUsers />}
             title="Belum ada data pengguna"
             description="Tambahkan akun staff untuk mulai memisahkan hak akses operasional."
           />
-        ) : (
+        )}
+
+        {users.length > 0 && (
           <>
             <div class="hidden md:block overflow-x-auto">
               <table class="w-full text-left border-collapse text-xs">

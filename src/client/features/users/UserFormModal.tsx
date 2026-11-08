@@ -191,6 +191,7 @@ export function UserFormModal(props: UserFormModalProps) {
 
         {isEdit && (
           <label
+            aria-label="Akun Aktif Diizinkan Login"
             class={[
               'rounded-xl border border-m3-outline-variant p-3.5 flex items-start gap-3 text-xs select-none',
               isEditingSelf
@@ -198,8 +199,10 @@ export function UserFormModal(props: UserFormModalProps) {
                 : 'bg-m3-surface-container-low cursor-pointer',
             ].join(' ')}
           >
+            <span class="sr-only">Akun Aktif Diizinkan Login</span>
             <input
               type="checkbox"
+              aria-label="Akun Aktif Diizinkan Login"
               checked={isActive}
               disabled={submitting || isEditingSelf}
               onChange={(e) => {

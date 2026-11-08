@@ -22,7 +22,12 @@ export function TextField(props: TextFieldProps) {
   const errorId = `${inputId}-error`
   const helperId = `${inputId}-helper`
   const hasError = Boolean(props.errorText)
-  const descriptionId = hasError ? errorId : props.helperText ? helperId : undefined
+  let descriptionId: string | undefined
+  if (hasError) {
+    descriptionId = errorId
+  } else if (props.helperText) {
+    descriptionId = helperId
+  }
 
   return (
     <div class={['flex flex-col gap-1.5', props.class ?? ''].join(' ').trim()}>
@@ -59,15 +64,16 @@ export function TextField(props: TextFieldProps) {
         ].join(' ')}
       />
 
-      {props.errorText ? (
+      {props.errorText && (
         <p id={errorId} class="text-xs text-m3-danger">
           {props.errorText}
         </p>
-      ) : props.helperText ? (
+      )}
+      {!props.errorText && props.helperText && (
         <p id={helperId} class="text-xs text-m3-on-surface-variant">
           {props.helperText}
         </p>
-      ) : null}
+      )}
     </div>
   )
 }

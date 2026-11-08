@@ -20,9 +20,19 @@ export interface PurchaseInvoiceModalProps {
 }
 
 interface ItemLine {
+  readonly id: string
   productId: number | null
   qty: number
   unitCost: number
+}
+
+function createEmptyLine(): ItemLine {
+  return {
+    id: crypto.randomUUID(),
+    productId: null,
+    qty: 1,
+    unitCost: 0,
+  }
 }
 
 export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
@@ -40,9 +50,7 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
   const [notes, setNotes] = useState('')
 
   // Invoice Items
-  const [items, setItems] = useState<ItemLine[]>([
-    { productId: null, qty: 1, unitCost: 0 },
-  ])
+  const [items, setItems] = useState<ItemLine[]>([createEmptyLine()])
 
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -74,7 +82,7 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
       setPaymentStatus('PAID')
       setDueDate('')
       setNotes('')
-      setItems([{ productId: null, qty: 1, unitCost: 0 }])
+      setItems([createEmptyLine()])
       setErrorMessage(null)
     }
   }, [props.open, loadLookups])
@@ -100,7 +108,7 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
   }, [items])
 
   const addLine = () => {
-    setItems((prev) => [...prev, { productId: null, qty: 1, unitCost: 0 }])
+    setItems((prev) => [...prev, createEmptyLine()])
   }
 
   const removeLine = (idx: number) => {
@@ -325,7 +333,7 @@ export function PurchaseInvoiceModal(props: PurchaseInvoiceModalProps) {
                     : null
 
                   return (
-                    <tr key={idx} class="hover:bg-m3-surface-container-low/40">
+                    <tr key={line.id} class="hover:bg-m3-surface-container-low/40">
                       <td class="p-2.5">
                         <select
                           value={line.productId !== null ? String(line.productId) : ''}

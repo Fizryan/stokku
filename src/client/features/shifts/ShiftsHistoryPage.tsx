@@ -18,6 +18,31 @@ import { TextField } from '../../components/ui/TextField.js'
 import { useToast } from '../../stores/toast.store.js'
 import { ShiftZReportModal } from './ShiftZReportModal.js'
 
+function ShiftDifferenceSpan({
+  status,
+  cashDifference,
+}: {
+  readonly status: ShiftStatus
+  readonly cashDifference: number | null
+}) {
+  if (status !== 'CLOSED' || cashDifference === null) {
+    return <span class="text-m3-on-surface-variant">-</span>
+  }
+  if (cashDifference === 0) {
+    return <span class="text-m3-success font-semibold">Pas (Rp 0)</span>
+  }
+  if (cashDifference > 0) {
+    return (
+      <span class="text-m3-primary font-semibold">+{formatRupiah(cashDifference)}</span>
+    )
+  }
+  return (
+    <span class="text-m3-danger font-semibold">
+      -{formatRupiah(Math.abs(cashDifference))}
+    </span>
+  )
+}
+
 export function ShiftsHistoryPage() {
   const { showToast } = useToast()
   const [shifts, setShifts] = useState<readonly CashShiftSummaryDTO[]>([])
@@ -164,7 +189,7 @@ export function ShiftsHistoryPage() {
 
       {/* Shifts Table */}
       <Card class="overflow-hidden">
-        {loading && shifts.length === 0 ? (
+        {loading && (
           <div class="p-8 space-y-4">
             {[1, 2, 3, 4, 5].map((n) => (
               <div
@@ -173,13 +198,17 @@ export function ShiftsHistoryPage() {
               />
             ))}
           </div>
-        ) : shifts.length === 0 ? (
+        )}
+
+        {!loading && shifts.length === 0 && (
           <EmptyState
             icon={<IconClock />}
             title="Belum ada data shift"
             description="Shift kasir yang dibuka atau ditutup akan tercatat otomatis di sini."
           />
-        ) : (
+        )}
+
+        {!loading && shifts.length > 0 && (
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-m3-on-surface">
               <thead class="bg-m3-surface-container text-m3-on-surface-variant border-b border-m3-outline-variant/60">
@@ -233,21 +262,10 @@ export function ShiftsHistoryPage() {
                     </td>
 
                     <td class="p-3.5 text-right tabular-nums">
-                      {s.status === 'CLOSED' && s.cashDifference !== null ? (
-                        s.cashDifference === 0 ? (
-                          <span class="text-m3-success font-semibold">Pas (Rp 0)</span>
-                        ) : s.cashDifference > 0 ? (
-                          <span class="text-m3-primary font-semibold">
-                            +{formatRupiah(s.cashDifference)}
-                          </span>
-                        ) : (
-                          <span class="text-m3-danger font-semibold">
-                            -{formatRupiah(Math.abs(s.cashDifference))}
-                          </span>
-                        )
-                      ) : (
-                        <span class="text-m3-on-surface-variant">-</span>
-                      )}
+                      <ShiftDifferenceSpan
+                        status={s.status}
+                        cashDifference={s.cashDifference}
+                      />
                     </td>
 
                     <td class="p-3.5 text-center">

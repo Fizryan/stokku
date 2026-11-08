@@ -344,7 +344,7 @@ export class CustomerRepository {
 
     if (query.search) {
       const escaped = `%${escapeSqlLikePattern(query.search)}%`
-      conditions.push("(phone LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\')")
+      conditions.push(String.raw`(phone LIKE ? ESCAPE '\' OR name LIKE ? ESCAPE '\')`)
       params.push(escaped, escaped)
     }
 

@@ -23,6 +23,19 @@ import { StockMovementModal } from '../inventory/StockMovementModal.js'
 import { CategoryManagerModal } from './CategoryManagerModal.js'
 import { ProductFormModal } from './ProductFormModal.js'
 
+function getStockTextColor(stockQty: number, isLowStock: boolean): string {
+  if (stockQty === 0) return 'text-m3-danger'
+  if (isLowStock) return 'text-m3-warning'
+  return 'text-m3-on-surface'
+}
+
+function ProductStockBadge({ product }: { readonly product: ProductDTO }) {
+  if (!product.isActive) return <Badge tone="neutral">Arsip</Badge>
+  if (product.stockQty === 0) return <Badge tone="danger">Habis</Badge>
+  if (product.isLowStock) return <Badge tone="warning">Menipis</Badge>
+  return <Badge tone="success">Aman</Badge>
+}
+
 export function CatalogPage() {
   const { can } = useAuth()
   const { showToast } = useToast()
@@ -192,11 +205,13 @@ export function CatalogPage() {
           </label>
         </div>
 
-        {loading && !productsData ? (
+        {loading && !productsData && (
           <div class="py-12 text-center text-xs text-m3-on-surface-variant">
             Memuat data katalog produk...
           </div>
-        ) : products.length === 0 ? (
+        )}
+
+        {!loading && products.length === 0 && (
           <EmptyState
             icon={<IconCatalog />}
             title="Belum ada produk yang cocok"
@@ -216,7 +231,9 @@ export function CatalogPage() {
               ) : undefined
             }
           />
-        ) : (
+        )}
+
+        {products.length > 0 && (
           <>
             {/* Desktop & Tablet Table View */}
             <div class="hidden md:block overflow-x-auto">
@@ -264,11 +281,7 @@ export function CatalogPage() {
                         <span
                           class={[
                             'font-semibold',
-                            prod.stockQty === 0
-                              ? 'text-m3-danger'
-                              : prod.isLowStock
-                                ? 'text-m3-warning'
-                                : 'text-m3-on-surface',
+                            getStockTextColor(prod.stockQty, prod.isLowStock),
                           ].join(' ')}
                         >
                           {formatInteger(prod.stockQty)} {prod.unit}
@@ -278,15 +291,7 @@ export function CatalogPage() {
                         </p>
                       </td>
                       <td class="py-3 px-3 text-center">
-                        {!prod.isActive ? (
-                          <Badge tone="neutral">Arsip</Badge>
-                        ) : prod.stockQty === 0 ? (
-                          <Badge tone="danger">Habis</Badge>
-                        ) : prod.isLowStock ? (
-                          <Badge tone="warning">Menipis</Badge>
-                        ) : (
-                          <Badge tone="success">Aman</Badge>
-                        )}
+                        <ProductStockBadge product={prod} />
                       </td>
                       {(canManageCatalog || canManageInventory) && (
                         <td class="py-3 px-3 text-right">
@@ -339,15 +344,7 @@ export function CatalogPage() {
                         {prod.sku} · {prod.categoryName ?? 'Tanpa Kategori'}
                       </p>
                     </div>
-                    {!prod.isActive ? (
-                      <Badge tone="neutral">Arsip</Badge>
-                    ) : prod.stockQty === 0 ? (
-                      <Badge tone="danger">Habis</Badge>
-                    ) : prod.isLowStock ? (
-                      <Badge tone="warning">Menipis</Badge>
-                    ) : (
-                      <Badge tone="success">Aman</Badge>
-                    )}
+                    <ProductStockBadge product={prod} />
                   </div>
 
                   <div class="flex items-center justify-between text-xs pt-1 border-t border-m3-outline-variant/40 tabular-nums">

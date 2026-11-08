@@ -31,7 +31,7 @@ export class BackupService implements BackupServiceContract {
 
     mkdirSync(this.deps.backupDir, { recursive: true })
 
-    const normalizedTarget = targetPath.replace(/\\/g, '/').replace(/'/g, "''")
+    const normalizedTarget = targetPath.replaceAll('\\', '/').replaceAll("'", "''")
 
     try {
       this.deps.db.exec(`VACUUM INTO '${normalizedTarget}';`)

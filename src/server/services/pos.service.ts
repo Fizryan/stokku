@@ -1,6 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { hasPermission, LOYALTY_RULES } from '../../shared/constants.js'
+import {
+  hasPermission,
+  LOYALTY_RULES,
+  type PaymentMethod,
+} from '../../shared/constants.js'
 import type {
   CheckoutSaleInput,
   SalesQueryInput,
@@ -22,7 +26,7 @@ import type {
 import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
 import type { CustomerRepository } from '../repositories/customer.repo.js'
-import type { ProductRepository } from '../repositories/product.repo.js'
+import type { ProductRecord, ProductRepository } from '../repositories/product.repo.js'
 import type { SaleRepository } from '../repositories/sale.repo.js'
 import type { ShiftRepository } from '../repositories/shift.repo.js'
 import type { InventoryService } from './inventory.service.js'
@@ -175,6 +179,18 @@ export interface PosServiceDeps {
   readonly auditService?: AuditServiceContract
 }
 
+interface RecordLoyaltyMutationsParams {
+  readonly customerId: number | null
+  readonly totalAmount: number
+  readonly pointsEarned: number
+  readonly pointsRedeemed: number
+  readonly pointsDiscountAmount: number
+  readonly saleId: number
+  readonly invoiceNumber: string
+  readonly actorId: number
+  readonly nowIso: string
+}
+
 export class PosService implements PosServiceContract {
   private readonly deps: PosServiceDeps
 
@@ -184,6 +200,264 @@ export class PosService implements PosServiceContract {
 
   private canSeeFinancials(actor: UserDTO): boolean {
     return hasPermission(actor.role, 'dashboard:financials')
+  }
+
+  private validateAndResolveItems(
+    sortedProductIds: readonly number[],
+    qtyByProductId: ReadonlyMap<number, number>,
+  ): {
+    productsMap: Map<number, ProductRecord>
+    resolvedItems: Array<{
+      productId: number
+      skuSnapshot: string
+      productNameSnapshot: string
+      unitSnapshot: string
+      qty: number
+      costPriceAtSale: number
+      sellPriceAtSale: number
+      lineSubtotal: number
+    }>
+    subtotalAmount: number
+  } {
+    const productsMap = this.deps.productRepo.findByIds(sortedProductIds)
+
+    for (const productId of sortedProductIds) {
+      const product = productsMap.get(productId)
+      if (!product) {
+        throw AppError.notFound(`Produk dengan ID #${productId} tidak ditemukan.`)
+      }
+      if (!product.isActive) {
+        throw AppError.badRequest(
+          `Produk "${product.name}" (${product.sku}) sedang diarsipkan dan tidak dapat dijual.`,
+        )
+      }
+    }
+
+    const aggregatedItems = sortedProductIds.map((id) => ({
+      productId: id,
+      qty: qtyByProductId.get(id) ?? 0,
+    }))
+    const deficiencies = diagnoseStockDeficiencies(aggregatedItems, productsMap)
+    if (deficiencies.length > 0) {
+      const deficiencyDetails = deficiencies.map(
+        (d) =>
+          `"${d.name}" (${d.sku}): diminta ${d.requestedQty} ${d.unit}, tersedia ${d.availableQty} ${d.unit} (kurang ${d.deficitQty})`,
+      )
+      throw AppError.insufficientStock(
+        `Stok tidak mencukupi untuk ${deficiencies.length} produk:\n${deficiencyDetails.join('\n')}`,
+      )
+    }
+
+    let subtotalAmount = 0
+    const resolvedItems: Array<{
+      productId: number
+      skuSnapshot: string
+      productNameSnapshot: string
+      unitSnapshot: string
+      qty: number
+      costPriceAtSale: number
+      sellPriceAtSale: number
+      lineSubtotal: number
+    }> = []
+
+    for (const productId of sortedProductIds) {
+      const qty = qtyByProductId.get(productId) ?? 0
+      const product = productsMap.get(productId)
+
+      if (!product) {
+        throw new Error(
+          `Invariant violation: product #${productId} missing after diagnostic.`,
+        )
+      }
+
+      const lineSubtotal = product.sellPrice * qty
+      subtotalAmount += lineSubtotal
+
+      resolvedItems.push({
+        productId: product.id,
+        skuSnapshot: product.sku,
+        productNameSnapshot: product.name,
+        unitSnapshot: product.unit,
+        qty,
+        costPriceAtSale: product.costPrice,
+        sellPriceAtSale: product.sellPrice,
+        lineSubtotal,
+      })
+    }
+
+    return { productsMap, resolvedItems, subtotalAmount }
+  }
+
+  private resolveCustomerLoyalty(
+    customerIdInput?: number | null,
+    pointsRedeemedInput = 0,
+    customerNameInput?: string | null,
+  ): {
+    customerId: number | null
+    resolvedCustomerName: string | null
+    pointsRedeemed: number
+    pointsDiscountAmount: number
+  } {
+    if (!customerIdInput || !this.deps.customerRepo) {
+      return {
+        customerId: null,
+        resolvedCustomerName: customerNameInput ?? null,
+        pointsRedeemed: 0,
+        pointsDiscountAmount: 0,
+      }
+    }
+
+    const customer = this.deps.customerRepo.findById(customerIdInput)
+    if (!customer) {
+      throw AppError.notFound(`Pelanggan dengan ID #${customerIdInput} tidak ditemukan.`)
+    }
+    if (!customer.isActive) {
+      throw AppError.badRequest(`Akun pelanggan "${customer.name}" sedang tidak aktif.`)
+    }
+
+    if (pointsRedeemedInput <= 0) {
+      return {
+        customerId: customer.id,
+        resolvedCustomerName: customer.name,
+        pointsRedeemed: 0,
+        pointsDiscountAmount: 0,
+      }
+    }
+
+    if (pointsRedeemedInput > customer.pointsBalance) {
+      throw AppError.badRequest(
+        `Poin yang ditukarkan (${pointsRedeemedInput} poin) melebihi saldo pelanggan (${customer.pointsBalance} poin).`,
+      )
+    }
+
+    return {
+      customerId: customer.id,
+      resolvedCustomerName: customer.name,
+      pointsRedeemed: pointsRedeemedInput,
+      pointsDiscountAmount: pointsRedeemedInput * LOYALTY_RULES.POINT_VALUE_IN_RUPIAH,
+    }
+  }
+
+  private validatePaymentAndTotals(
+    subtotalAmount: number,
+    discountAmount: number,
+    pointsDiscountAmount: number,
+    paidAmount: number,
+    paymentMethod: PaymentMethod,
+  ): {
+    totalDiscount: number
+    totalAmount: number
+    changeAmount: number
+  } {
+    const totalDiscount = discountAmount + pointsDiscountAmount
+    if (totalDiscount > subtotalAmount) {
+      throw AppError.validation(
+        'Total diskon (termasuk diskon poin reward) tidak boleh melebihi subtotal belanja.',
+        [{ path: 'discountAmount', message: 'Diskon melebihi subtotal belanja.' }],
+      )
+    }
+
+    const baseTotal = subtotalAmount - totalDiscount
+    const rounding = calculateCashRounding(baseTotal, paymentMethod)
+    const totalAmount = rounding.roundedAmount
+
+    if (paidAmount < totalAmount) {
+      throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
+        {
+          path: 'paidAmount',
+          message: `Minimal pembayaran adalah Rp ${totalAmount.toLocaleString('id-ID')}.`,
+        },
+      ])
+    }
+
+    if (paymentMethod !== 'CASH' && paidAmount !== totalAmount) {
+      throw AppError.validation(
+        'Pembayaran non-tunai (QRIS / Transfer) harus sesuai persis dengan total tagihan.',
+        [{ path: 'paidAmount', message: 'Nominal non-tunai harus pas.' }],
+      )
+    }
+
+    return {
+      totalDiscount,
+      totalAmount,
+      changeAmount: paidAmount - totalAmount,
+    }
+  }
+
+  private recordStockDeductions(
+    saleId: number,
+    invoiceNumber: string,
+    actorId: number,
+    nowIso: string,
+    sortedProductIds: readonly number[],
+    productsMap: Map<number, ProductRecord>,
+    qtyByProductId: ReadonlyMap<number, number>,
+  ): void {
+    for (const productId of sortedProductIds) {
+      const product = productsMap.get(productId)
+      const qty = qtyByProductId.get(productId)
+      if (!product || qty === undefined) {
+        throw new Error(
+          `Invariant violation: missing product or quantity for #${productId} during checkout.`,
+        )
+      }
+      this.deps.inventoryService.deductStockForSaleItemInTx({
+        product,
+        qty,
+        saleId,
+        invoiceNumber,
+        actorUserId: actorId,
+        nowIso,
+      })
+    }
+  }
+
+  private recordLoyaltyMutations(params: RecordLoyaltyMutationsParams): void {
+    const {
+      customerId,
+      totalAmount,
+      pointsEarned,
+      pointsRedeemed,
+      pointsDiscountAmount,
+      saleId,
+      invoiceNumber,
+      actorId,
+      nowIso,
+    } = params
+    if (!customerId || !this.deps.customerRepo) return
+
+    const netPointsDelta = pointsEarned - pointsRedeemed
+    this.deps.customerRepo.incrementSpendAndVisitInTx(
+      customerId,
+      totalAmount,
+      netPointsDelta,
+    )
+
+    if (pointsRedeemed > 0) {
+      this.deps.customerRepo.recordPointMutationInTx({
+        customerId,
+        points: -pointsRedeemed,
+        mutationType: 'REDEEMED',
+        referenceType: 'SALE',
+        referenceId: saleId,
+        description: `Tukar ${pointsRedeemed} poin (Diskon Rp ${pointsDiscountAmount.toLocaleString('id-ID')}) — ${invoiceNumber}`,
+        actorUserId: actorId,
+        nowIso,
+      })
+    }
+
+    if (pointsEarned > 0) {
+      this.deps.customerRepo.recordPointMutationInTx({
+        customerId,
+        points: pointsEarned,
+        mutationType: 'EARNED',
+        referenceType: 'SALE',
+        referenceId: saleId,
+        description: `Perolehan poin belanja — ${invoiceNumber}`,
+        actorUserId: actorId,
+        nowIso,
+      })
+    }
   }
 
   public checkout(actor: UserDTO, input: CheckoutSaleInput): SaleDetailDTO {
@@ -203,226 +477,75 @@ export class PosService implements PosServiceContract {
     }
 
     const sortedProductIds = Array.from(qtyByProductId.keys()).sort((a, b) => a - b)
-
     const now = new Date()
     const nowIso = now.toISOString()
     const includeFinancials = this.canSeeFinancials(actor)
 
     return runInImmediateTransaction(this.deps.db, () => {
-      const productsMap = this.deps.productRepo.findByIds(sortedProductIds)
+      const { productsMap, resolvedItems, subtotalAmount } = this.validateAndResolveItems(
+        sortedProductIds,
+        qtyByProductId,
+      )
 
-      //Batch Stock Deficiency Diagnostic
-      // pemeriksaan produk tidak ditemukan / non-aktif (fail-fast sah di sini)
-      for (const productId of sortedProductIds) {
-        const product = productsMap.get(productId)
-        if (!product) {
-          throw AppError.notFound(`Produk dengan ID #${productId} tidak ditemukan.`)
-        }
-        if (!product.isActive) {
-          throw AppError.badRequest(
-            `Produk "${product.name}" (${product.sku}) sedang diarsipkan dan tidak dapat dijual.`,
-          )
-        }
-      }
+      const loyalty = this.resolveCustomerLoyalty(
+        input.customerId,
+        input.pointsRedeemed,
+        input.customerName,
+      )
 
-      const aggregatedItems = sortedProductIds.map((id) => ({
-        productId: id,
-        qty: qtyByProductId.get(id) ?? 0,
-      }))
-      const deficiencies = diagnoseStockDeficiencies(aggregatedItems, productsMap)
-      if (deficiencies.length > 0) {
-        const deficiencyDetails = deficiencies.map(
-          (d) =>
-            `"${d.name}" (${d.sku}): diminta ${d.requestedQty} ${d.unit}, tersedia ${d.availableQty} ${d.unit} (kurang ${d.deficitQty})`,
-        )
-        throw AppError.insufficientStock(
-          `Stok tidak mencukupi untuk ${deficiencies.length} produk:\n${deficiencyDetails.join('\n')}`,
-        )
-      }
+      const payment = this.validatePaymentAndTotals(
+        subtotalAmount,
+        input.discountAmount,
+        loyalty.pointsDiscountAmount,
+        input.paidAmount,
+        input.paymentMethod,
+      )
 
-      let subtotalAmount = 0
-      const resolvedItems: Array<{
-        productId: number
-        skuSnapshot: string
-        productNameSnapshot: string
-        unitSnapshot: string
-        qty: number
-        costPriceAtSale: number
-        sellPriceAtSale: number
-        lineSubtotal: number
-      }> = []
-
-      for (const productId of sortedProductIds) {
-        const qty = qtyByProductId.get(productId) ?? 0
-        const product = productsMap.get(productId)
-
-        // Stok sudah divalidasi batch di atas; asersi tipe aman di sini
-        if (!product) {
-          throw new Error(
-            `Invariant violation: product #${productId} missing after diagnostic.`,
-          )
-        }
-
-        const lineSubtotal = product.sellPrice * qty
-        subtotalAmount += lineSubtotal
-
-        resolvedItems.push({
-          productId: product.id,
-          skuSnapshot: product.sku,
-          productNameSnapshot: product.name,
-          unitSnapshot: product.unit,
-          qty,
-          costPriceAtSale: product.costPrice,
-          sellPriceAtSale: product.sellPrice,
-          lineSubtotal,
-        })
-      }
-
-      // Customer and Loyalty Points Resolution
-      let customerId: number | null = null
-      let resolvedCustomerName: string | null = input.customerName ?? null
-      let pointsRedeemed = 0
-      let pointsDiscountAmount = 0
-
-      if (input.customerId && this.deps.customerRepo) {
-        const customer = this.deps.customerRepo.findById(input.customerId)
-        if (!customer) {
-          throw AppError.notFound(
-            `Pelanggan dengan ID #${input.customerId} tidak ditemukan.`,
-          )
-        }
-        if (!customer.isActive) {
-          throw AppError.badRequest(
-            `Akun pelanggan "${customer.name}" sedang tidak aktif.`,
-          )
-        }
-
-        customerId = customer.id
-        resolvedCustomerName = customer.name
-
-        if (input.pointsRedeemed > 0) {
-          if (input.pointsRedeemed > customer.pointsBalance) {
-            throw AppError.badRequest(
-              `Poin yang ditukarkan (${input.pointsRedeemed} poin) melebihi saldo pelanggan (${customer.pointsBalance} poin).`,
-            )
-          }
-          pointsRedeemed = input.pointsRedeemed
-          pointsDiscountAmount = pointsRedeemed * LOYALTY_RULES.POINT_VALUE_IN_RUPIAH
-        }
-      }
-
-      const totalDiscount = input.discountAmount + pointsDiscountAmount
-
-      if (totalDiscount > subtotalAmount) {
-        throw AppError.validation(
-          'Total diskon (termasuk diskon poin reward) tidak boleh melebihi subtotal belanja.',
-          [{ path: 'discountAmount', message: 'Diskon melebihi subtotal belanja.' }],
-        )
-      }
-
-      const baseTotal = subtotalAmount - totalDiscount
-
-      // Pembulatan kas tunai (CASH) ke pecahan Rp 500 terdekat
-      const rounding = calculateCashRounding(baseTotal, input.paymentMethod)
-      const totalAmount = rounding.roundedAmount
-
-      if (input.paidAmount < totalAmount) {
-        throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
-          {
-            path: 'paidAmount',
-            message: `Minimal pembayaran adalah Rp ${totalAmount.toLocaleString('id-ID')}.`,
-          },
-        ])
-      }
-
-      if (input.paymentMethod !== 'CASH' && input.paidAmount !== totalAmount) {
-        throw AppError.validation(
-          'Pembayaran non-tunai (QRIS / Transfer) harus sesuai persis dengan total tagihan.',
-          [{ path: 'paidAmount', message: 'Nominal non-tunai harus pas.' }],
-        )
-      }
-
-      const changeAmount = input.paidAmount - totalAmount
       const invoiceNumber = this.deps.saleRepo.generateNextInvoiceNumber(now)
-
-      // Calculate earned points from net total amount (setelah pembulatan)
-      const pointsEarned = customerId
-        ? Math.floor(totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
+      const pointsEarned = loyalty.customerId
+        ? Math.floor(payment.totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
         : 0
 
       const saleId = this.deps.saleRepo.createSaleRecord({
         shiftId: activeShift.id,
         invoiceNumber,
         cashierUserId: actor.id,
-        customerId,
-        customerName: resolvedCustomerName,
+        customerId: loyalty.customerId,
+        customerName: loyalty.resolvedCustomerName,
         pointsEarned,
-        pointsRedeemed,
-        pointsDiscountAmount,
+        pointsRedeemed: loyalty.pointsRedeemed,
+        pointsDiscountAmount: loyalty.pointsDiscountAmount,
         subtotalAmount,
-        discountAmount: totalDiscount,
-        totalAmount,
+        discountAmount: payment.totalDiscount,
+        totalAmount: payment.totalAmount,
         paymentMethod: input.paymentMethod,
         paidAmount: input.paidAmount,
-        changeAmount,
+        changeAmount: payment.changeAmount,
         nowIso,
         items: resolvedItems,
       })
 
-      // Deduct inventory stock for each sale item
-      for (const productId of sortedProductIds) {
-        const product = productsMap.get(productId)
-        const qty = qtyByProductId.get(productId)
-        if (!product || qty === undefined) {
-          throw new Error(
-            `Invariant violation: missing product or quantity for #${productId} during checkout.`,
-          )
-        }
-        this.deps.inventoryService.deductStockForSaleItemInTx({
-          product,
-          qty,
-          saleId,
-          invoiceNumber,
-          actorUserId: actor.id,
-          nowIso,
-        })
-      }
+      this.recordStockDeductions(
+        saleId,
+        invoiceNumber,
+        actor.id,
+        nowIso,
+        sortedProductIds,
+        productsMap,
+        qtyByProductId,
+      )
 
-      // Mutate customer loyalty balance and audit log
-      if (customerId && this.deps.customerRepo) {
-        const netPointsDelta = pointsEarned - pointsRedeemed
-        this.deps.customerRepo.incrementSpendAndVisitInTx(
-          customerId,
-          totalAmount,
-          netPointsDelta,
-        )
-
-        if (pointsRedeemed > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
-            customerId,
-            points: -pointsRedeemed,
-            mutationType: 'REDEEMED',
-            referenceType: 'SALE',
-            referenceId: saleId,
-            description: `Tukar ${pointsRedeemed} poin (Diskon Rp ${pointsDiscountAmount.toLocaleString('id-ID')}) — ${invoiceNumber}`,
-            actorUserId: actor.id,
-            nowIso,
-          })
-        }
-
-        if (pointsEarned > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
-            customerId,
-            points: pointsEarned,
-            mutationType: 'EARNED',
-            referenceType: 'SALE',
-            referenceId: saleId,
-            description: `Perolehan poin belanja — ${invoiceNumber}`,
-            actorUserId: actor.id,
-            nowIso,
-          })
-        }
-      }
+      this.recordLoyaltyMutations({
+        customerId: loyalty.customerId,
+        totalAmount: payment.totalAmount,
+        pointsEarned,
+        pointsRedeemed: loyalty.pointsRedeemed,
+        pointsDiscountAmount: loyalty.pointsDiscountAmount,
+        saleId,
+        invoiceNumber,
+        actorId: actor.id,
+        nowIso,
+      })
 
       const detail = this.deps.saleRepo.findDetailById(saleId, includeFinancials)
       if (!detail) {

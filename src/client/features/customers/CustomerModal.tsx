@@ -176,6 +176,7 @@ export function CustomerModal(props: CustomerModalProps) {
               </p>
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
+              <span class="sr-only">Status Pelanggan Aktif</span>
               <input
                 type="checkbox"
                 checked={isActive}

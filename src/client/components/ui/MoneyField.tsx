@@ -18,7 +18,12 @@ export function MoneyField(props: MoneyFieldProps) {
   const errorId = `${inputId}-error`
   const helperId = `${inputId}-helper`
   const hasError = Boolean(props.errorText)
-  const descriptionId = hasError ? errorId : props.helperText ? helperId : undefined
+  let descriptionId: string | undefined
+  if (hasError) {
+    descriptionId = errorId
+  } else if (props.helperText) {
+    descriptionId = helperId
+  }
   const displayValue = props.value === 0 ? '0' : formatInteger(props.value)
 
   return (
@@ -59,15 +64,16 @@ export function MoneyField(props: MoneyFieldProps) {
         />
       </div>
 
-      {props.errorText ? (
+      {props.errorText && (
         <p id={errorId} class="text-xs text-m3-danger">
           {props.errorText}
         </p>
-      ) : props.helperText ? (
+      )}
+      {!props.errorText && props.helperText && (
         <p id={helperId} class="text-xs text-m3-on-surface-variant">
           {props.helperText}
         </p>
-      ) : null}
+      )}
     </div>
   )
 }
