@@ -17,6 +17,12 @@ export function createInventoryRoutes(services: AppServices) {
 
   return new Hono<HonoAppEnv>()
     .use('*', requireAuth)
+    .get('/expiring', requirePermission('inventory:view'), (c) => {
+      return c.json(
+        { ok: true as const, data: services.inventory.listExpiringStock(30) },
+        200,
+      )
+    })
     .get('/movements', canView, validateQuery(movementQuerySchema), (c) => {
       const actor = c.get('currentUser')
       const query = c.req.valid('query')

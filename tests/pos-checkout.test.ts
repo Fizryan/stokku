@@ -3,7 +3,9 @@ import { afterEach, describe, it } from 'node:test'
 import type {
   DashboardMetricsDTO,
   ProductDTO,
+  PurchaseDetailDTO,
   SaleDetailDTO,
+  SupplierDTO,
   UserDTO,
 } from '../src/shared/types.js'
 import { createTestHarness, type TestHarness } from './helpers/test-app.js'
@@ -64,6 +66,48 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     const prod1 = p1Res.body.data
     const prod2 = p2Res.body.data
 
+    const supplierRes = await owner.requestJson<SupplierDTO>('/api/suppliers', {
+      method: 'POST',
+      json: { name: 'Supplier Batch FEFO' },
+    })
+    assert(supplierRes.body.ok)
+    const earlyExpiry = new Date()
+    earlyExpiry.setDate(earlyExpiry.getDate() + 7)
+    const lateExpiry = new Date()
+    lateExpiry.setDate(lateExpiry.getDate() + 21)
+    const purchaseRes = await owner.requestJson<PurchaseDetailDTO>('/api/purchases', {
+      method: 'POST',
+      json: {
+        invoiceNumber: 'FEFO-TEST-001',
+        supplierId: supplierRes.body.data.id,
+        paymentStatus: 'PAID',
+        items: [
+          {
+            productId: prod1.id,
+            qty: 2,
+            unitCost: 8_000,
+            expiryDate: lateExpiry.toISOString().slice(0, 10),
+          },
+          {
+            productId: prod1.id,
+            qty: 2,
+            unitCost: 8_000,
+            expiryDate: earlyExpiry.toISOString().slice(0, 10),
+          },
+        ],
+      },
+    })
+    assert.equal(purchaseRes.status, 201)
+    const expiredDate = new Date()
+    expiredDate.setDate(expiredDate.getDate() - 1)
+    harness.db
+      .prepare(`
+        UPDATE stock_batches
+        SET expiry_date = ?
+        WHERE product_id = ? AND source_type = 'INITIAL'
+      `)
+      .run(expiredDate.toISOString().slice(0, 10), prod1.id)
+
     const openShiftRes = await owner.requestJson('/api/shifts/open', {
       method: 'POST',
       json: { openingCash: 150_000, notes: 'Shift pagi owner' },
@@ -82,6 +126,22 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
       },
     })
     assert.equal(underpaidRes.status, 422)
+
+    const expiredStockCheckout = await owner.requestJson<SaleDetailDTO>('/api/sales', {
+      method: 'POST',
+      json: {
+        items: [{ productId: prod1.id, qty: 5 }],
+        discountAmount: 0,
+        paymentMethod: 'CASH',
+        paidAmount: 60_000,
+      },
+    })
+    assert.equal(expiredStockCheckout.status, 409)
+    assert.equal(expiredStockCheckout.body.ok, false)
+    if (expiredStockCheckout.body.ok) {
+      throw new Error('Checkout with expired stock unexpectedly succeeded.')
+    }
+    assert.match(expiredStockCheckout.body.error.message, /belum kedaluwarsa/i)
 
     // Valid checkout:
     // 3x SNACK-01 (3 * 12.000 = 36.000, cost = 24.000)
@@ -111,12 +171,24 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     assert.equal(sale.changeAmount, 25_000)
     assert.equal(sale.grossProfitAmount, 21_000)
 
-    // Verify stocks were atomically deducted (20 -> 17 and 10 -> 8)
+    // Verify stocks were atomically deducted (24 -> 21 and 10 -> 8)
     const lookup1 = await owner.requestJson<ProductDTO>(
       '/api/products/lookup?code=8990001',
     )
     assert(lookup1.body.ok)
-    assert.equal(lookup1.body.data.stockQty, 17)
+    assert.equal(lookup1.body.data.stockQty, 21)
+    const batchRowsAfterSale = harness.db
+      .prepare(`
+        SELECT expiry_date, qty_remaining
+        FROM stock_batches
+        WHERE product_id = ? AND expiry_date IS NOT NULL
+        ORDER BY expiry_date ASC
+      `)
+      .all(prod1.id) as Array<{ expiry_date: string; qty_remaining: number }>
+    assert.deepEqual(
+      batchRowsAfterSale.map((batch) => batch.qty_remaining),
+      [20, 0, 1],
+    )
 
     // Mutate master product prices AFTER the sale and verify historical sale snapshot is untouched!
     const updateProdRes = await owner.requestJson<ProductDTO>(
@@ -180,8 +252,20 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     )
     assert(lookupAfterVoid1.body.ok)
     assert(lookupAfterVoid2.body.ok)
-    assert.equal(lookupAfterVoid1.body.data.stockQty, 20)
+    assert.equal(lookupAfterVoid1.body.data.stockQty, 24)
     assert.equal(lookupAfterVoid2.body.data.stockQty, 10)
+    const batchRowsAfterVoid = harness.db
+      .prepare(`
+        SELECT qty_remaining
+        FROM stock_batches
+        WHERE product_id = ? AND expiry_date IS NOT NULL
+        ORDER BY expiry_date ASC
+      `)
+      .all(prod1.id) as Array<{ qty_remaining: number }>
+    assert.deepEqual(
+      batchRowsAfterVoid.map((batch) => batch.qty_remaining),
+      [20, 2, 2],
+    )
 
     // Double void must be rejected with 409 Conflict
     const doubleVoidRes = await owner.requestJson<SaleDetailDTO>(
