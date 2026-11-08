@@ -35,7 +35,7 @@ function escapeCsvCell(rawValue: string | number | null | undefined): string {
   }
 
   if (/[",\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
+    return `"${text.replaceAll('"', '""')}"`
   }
   return text
 }

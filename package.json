@@ -20,7 +20,8 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build": "pnpm run check && pnpm run typecheck && pnpm run build:client && pnpm run build:server",
     "start": "node --no-warnings dist/server/server/index.js",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:coverage": "node -e \"fs.mkdirSync('coverage', {recursive: true})\" && node --import tsx --test --experimental-test-coverage --test-coverage-include=\"src/server/**\" --test-coverage-include=\"src/shared/**\" --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info tests/**/*.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",

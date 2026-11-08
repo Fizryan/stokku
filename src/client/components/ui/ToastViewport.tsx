@@ -8,6 +8,16 @@ const variantStyles: Readonly<Record<ToastVariant, string>> = {
   error: 'bg-m3-danger text-white',
 }
 
+function ToastIcon({ variant }: { variant: ToastVariant }) {
+  if (variant === 'success') {
+    return <IconCheck class="w-4 h-4 shrink-0" />
+  }
+  if (variant === 'error' || variant === 'warning') {
+    return <IconAlert class="w-4 h-4 shrink-0" />
+  }
+  return null
+}
+
 export function ToastViewport() {
   const { toasts, dismissToast } = useToast()
   if (toasts.length === 0) return null
@@ -26,11 +36,7 @@ export function ToastViewport() {
           ].join(' ')}
         >
           <div class="flex items-center gap-2.5 min-w-0">
-            {toast.variant === 'success' ? (
-              <IconCheck class="w-4 h-4 shrink-0" />
-            ) : toast.variant === 'error' || toast.variant === 'warning' ? (
-              <IconAlert class="w-4 h-4 shrink-0" />
-            ) : null}
+            <ToastIcon variant={toast.variant} />
             <span class="leading-snug">{toast.title}</span>
           </div>
           <button
