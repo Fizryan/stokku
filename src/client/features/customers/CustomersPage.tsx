@@ -90,7 +90,7 @@ export function CustomersPage() {
     return () => controller.abort()
   }, [loadCustomers])
 
-  usePolling(() => loadCustomers(undefined, true), 5000)
+  usePolling((s) => loadCustomers(s, true), 5000)
 
   const handleResetFilters = () => {
     setSearch('')

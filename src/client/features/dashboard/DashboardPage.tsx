@@ -64,7 +64,7 @@ export function DashboardPage() {
     return () => controller.abort()
   }, [days, loadDashboard])
 
-  usePolling(() => loadDashboard(days, undefined, true), 5000)
+  usePolling((s) => loadDashboard(days, s, true), 5000)
 
   const canSeeFinancials = can('dashboard:financials')
 

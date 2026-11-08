@@ -101,7 +101,7 @@ export function CatalogPage() {
     return () => controller.abort()
   }, [loadProducts])
 
-  usePolling(() => loadProducts(undefined, true), 5000)
+  usePolling((s) => loadProducts(s, true), 5000)
 
   const products = productsData?.items ?? []
   const showCostColumn = products.some((p) => p.costPrice !== null) || canManageCatalog

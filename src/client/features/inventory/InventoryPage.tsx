@@ -107,7 +107,7 @@ export function InventoryPage() {
     return () => controller.abort()
   }, [loadMovements])
 
-  usePolling(() => loadMovements(undefined, true), 5000)
+  usePolling((s) => loadMovements(s, true), 5000)
 
   const movements = movementsData?.items ?? []
 

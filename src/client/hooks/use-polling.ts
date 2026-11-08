@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'hono/jsx/dom'
 
 export function usePolling(
-  refetch: () => void | Promise<void>,
+  refetch: (signal: AbortSignal) => void | Promise<void>,
   intervalMs = 5000,
   enabled = true,
 ) {
@@ -11,27 +11,30 @@ export function usePolling(
 
   useEffect(() => {
     if (!enabled) return
+    let controller: AbortController | null = null
 
     const tick = async () => {
       if (busyRef.current || document.hidden) return
       busyRef.current = true
       try {
-        await refetchRef.current()
+        controller = new AbortController()
+        await refetchRef.current(controller.signal)
       } finally {
         busyRef.current = false
+        controller = null
       }
     }
-
-    const id = setInterval(tick, intervalMs)
 
     const onVisible = () => {
       if (!document.hidden) void tick()
     }
     document.addEventListener('visibilitychange', onVisible)
+    const id = setInterval(tick, intervalMs)
 
     return () => {
       clearInterval(id)
       document.removeEventListener('visibilitychange', onVisible)
+      controller?.abort()
     }
   }, [enabled, intervalMs])
 }
