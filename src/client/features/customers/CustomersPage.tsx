@@ -223,7 +223,7 @@ export function CustomersPage() {
 
       {/* Customers Table */}
       <Card class="border border-m3-outline-variant overflow-hidden">
-        {loading ? (
+        {loading && (
           <div class="p-12 text-center">
             <div
               class="w-8 h-8 rounded-full border-3 border-m3-primary border-t-transparent animate-spin mx-auto"
@@ -233,7 +233,9 @@ export function CustomersPage() {
               Memuat data pelanggan...
             </p>
           </div>
-        ) : customers.length === 0 ? (
+        )}
+
+        {!loading && customers.length === 0 && (
           <div class="p-8">
             <EmptyState
               icon={<IconHeart class="w-10 h-10 text-m3-on-surface-variant" />}
@@ -254,7 +256,9 @@ export function CustomersPage() {
               }
             />
           </div>
-        ) : (
+        )}
+
+        {!loading && customers.length > 0 && (
           <div>
             <div class="overflow-x-auto">
               <table class="w-full text-left text-xs">

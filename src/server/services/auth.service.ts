@@ -40,9 +40,7 @@ export class AuthService implements AuthServiceContract {
   }
 
   private getDummyPasswordHash(): Promise<string> {
-    if (!this.dummyPasswordHashPromise) {
-      this.dummyPasswordHashPromise = hashPassword('stokku-constant-time-dummy-secret')
-    }
+    this.dummyPasswordHashPromise ??= hashPassword('stokku-constant-time-dummy-secret')
     return this.dummyPasswordHashPromise
   }
 

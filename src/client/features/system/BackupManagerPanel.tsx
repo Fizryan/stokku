@@ -126,18 +126,22 @@ export function BackupManagerPanel() {
           </span>
         </div>
 
-        {loading && backups.length === 0 ? (
+        {loading && backups.length === 0 && (
           <div class="p-12 text-center text-m3-on-surface-variant">
             <IconRefresh class="w-6 h-6 animate-spin mx-auto mb-2 text-m3-primary" />
             <p class="text-xs">Memeriksa direktori backup...</p>
           </div>
-        ) : backups.length === 0 ? (
+        )}
+
+        {!loading && backups.length === 0 && (
           <EmptyState
             icon={<IconDatabase />}
             title="Belum Ada Cadangan Database"
             description="Klik tombol 'Buat Backup Sekarang' di atas untuk membuat snapshot perdana database toko Anda."
           />
-        ) : (
+        )}
+
+        {backups.length > 0 && (
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-m3-on-surface">
               <thead class="bg-m3-surface-container text-m3-on-surface-variant border-b border-m3-outline-variant/60">

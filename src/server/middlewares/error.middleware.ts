@@ -18,12 +18,12 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
 
   if (err instanceof HTTPException) {
     const status = err.status
-    const message =
-      status === 403
-        ? 'Permintaan ditolak oleh kebijakan keamanan (CSRF / Origin).'
-        : status === 413
-          ? 'Ukuran payload melebihi batas maksimum.'
-          : err.message || 'Permintaan HTTP tidak dapat diproses.'
+    let message = err.message || 'Permintaan HTTP tidak dapat diproses.'
+    if (status === 403) {
+      message = 'Permintaan ditolak oleh kebijakan keamanan (CSRF / Origin).'
+    } else if (status === 413) {
+      message = 'Ukuran payload melebihi batas maksimum.'
+    }
 
     const body: ApiFailureResponse = {
       ok: false,

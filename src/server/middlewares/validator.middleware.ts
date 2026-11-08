@@ -6,7 +6,7 @@ import type { ApiErrorDetail, ApiFailureResponse } from '../../shared/types.js'
 
 function formatZodIssues(issues: readonly z.core.$ZodIssue[]): ApiErrorDetail[] {
   return issues.map((issue) => ({
-    path: issue.path.map((segment) => String(segment)).join('.'),
+    path: issue.path.map(String).join('.'),
     message: issue.message,
   }))
 }

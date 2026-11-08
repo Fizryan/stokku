@@ -187,17 +187,21 @@ export function InventoryPage() {
           />
         </div>
 
-        {loading && !movementsData ? (
+        {loading && !movementsData && (
           <div class="py-12 text-center text-xs text-m3-on-surface-variant">
             Memuat histori Kartu Stok...
           </div>
-        ) : movements.length === 0 ? (
+        )}
+
+        {!loading && movements.length === 0 && (
           <EmptyState
             icon={<IconInventory />}
             title="Belum ada catatan mutasi stok"
             description="Setiap stok awal produk, restock gudang, opname, maupun transaksi POS akan tercatat otomatis di sini."
           />
-        ) : (
+        )}
+
+        {movements.length > 0 && (
           <>
             <div class="hidden md:block overflow-x-auto">
               <table class="w-full text-left border-collapse text-xs">

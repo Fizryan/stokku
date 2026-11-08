@@ -15,6 +15,84 @@ export interface SupplierManagerModalProps {
   readonly onSupplierMutated?: () => void
 }
 
+interface SupplierListContentProps {
+  readonly loading: boolean
+  readonly suppliers: readonly SupplierDTO[]
+  readonly editingId: number | null
+  readonly onEdit: (s: SupplierDTO) => void
+}
+
+function SupplierListContent({
+  loading,
+  suppliers,
+  editingId,
+  onEdit,
+}: SupplierListContentProps) {
+  if (loading) {
+    return (
+      <div class="space-y-2">
+        {[1, 2, 3].map((n) => (
+          <div key={n} class="h-16 rounded-xl bg-m3-surface-container animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  if (suppliers.length === 0) {
+    return (
+      <EmptyState
+        icon={<IconTruck />}
+        title="Belum ada supplier"
+        description="Tambahkan supplier pertama untuk mulai mencatat faktur pembelian."
+      />
+    )
+  }
+
+  return (
+    <div class="divide-y divide-m3-outline-variant/50">
+      {suppliers.map((s) => (
+        <div
+          key={s.id}
+          class={[
+            'p-3 rounded-2xl transition-colors flex items-start justify-between gap-3',
+            editingId === s.id
+              ? 'bg-m3-primary-container/30 border border-m3-primary/40'
+              : 'hover:bg-m3-surface-container-low',
+          ].join(' ')}
+        >
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <p class="text-xs font-bold text-m3-on-surface truncate">{s.name}</p>
+              <Badge tone={s.isActive ? 'success' : 'neutral'} class="text-[10px]">
+                {s.isActive ? 'Aktif' : 'Arsip'}
+              </Badge>
+            </div>
+            {s.contactPerson && (
+              <p class="text-[11px] text-m3-on-surface-variant mt-0.5">
+                Kontak: {s.contactPerson} {s.phone ? `(${s.phone})` : ''}
+              </p>
+            )}
+            {s.address && (
+              <p class="text-[10px] text-m3-on-surface-variant truncate mt-0.5">
+                {s.address}
+              </p>
+            )}
+          </div>
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onEdit(s)}
+            aria-label={`Edit ${s.name}`}
+          >
+            <IconEdit class="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function SupplierManagerModal(props: SupplierManagerModalProps) {
   const { showToast } = useToast()
   const [suppliers, setSuppliers] = useState<readonly SupplierDTO[]>([])
@@ -137,69 +215,12 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
             )}
           </div>
 
-          {loading ? (
-            <div class="space-y-2">
-              {[1, 2, 3].map((n) => (
-                <div
-                  key={n}
-                  class="h-16 rounded-xl bg-m3-surface-container animate-pulse"
-                />
-              ))}
-            </div>
-          ) : suppliers.length === 0 ? (
-            <EmptyState
-              icon={<IconTruck />}
-              title="Belum ada supplier"
-              description="Tambahkan supplier pertama untuk mulai mencatat faktur pembelian."
-            />
-          ) : (
-            <div class="divide-y divide-m3-outline-variant/50">
-              {suppliers.map((s) => (
-                <div
-                  key={s.id}
-                  class={[
-                    'p-3 rounded-2xl transition-colors flex items-start justify-between gap-3',
-                    editingId === s.id
-                      ? 'bg-m3-primary-container/30 border border-m3-primary/40'
-                      : 'hover:bg-m3-surface-container-low',
-                  ].join(' ')}
-                >
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <p class="text-xs font-bold text-m3-on-surface truncate">
-                        {s.name}
-                      </p>
-                      <Badge
-                        tone={s.isActive ? 'success' : 'neutral'}
-                        class="text-[10px]"
-                      >
-                        {s.isActive ? 'Aktif' : 'Arsip'}
-                      </Badge>
-                    </div>
-                    {s.contactPerson && (
-                      <p class="text-[11px] text-m3-on-surface-variant mt-0.5">
-                        Kontak: {s.contactPerson} {s.phone ? `(${s.phone})` : ''}
-                      </p>
-                    )}
-                    {s.address && (
-                      <p class="text-[10px] text-m3-on-surface-variant truncate mt-0.5">
-                        {s.address}
-                      </p>
-                    )}
-                  </div>
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => startEdit(s)}
-                    aria-label={`Edit ${s.name}`}
-                  >
-                    <IconEdit class="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+          <SupplierListContent
+            loading={loading}
+            suppliers={suppliers}
+            editingId={editingId}
+            onEdit={startEdit}
+          />
         </div>
 
         {/* Right Side: Create / Edit Form */}
@@ -278,7 +299,7 @@ export function SupplierManagerModal(props: SupplierManagerModalProps) {
                   }
                   class="rounded text-m3-primary focus:ring-m3-primary"
                 />
-                Status Supplier Aktif
+                <span>Status Supplier Aktif</span>
               </label>
             )}
 

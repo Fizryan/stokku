@@ -51,11 +51,14 @@ export function loadServerConfig(rawEnv: NodeJS.ProcessEnv = process.env): Serve
     mkdirSync(dirname(resolvedDbPath), { recursive: true })
   }
 
-  const resolvedBackupDir = parsed.BACKUP_DIR
-    ? resolve(parsed.BACKUP_DIR)
-    : resolvedDbPath === ':memory:'
-      ? resolve('./data/backups')
-      : resolve(dirname(resolvedDbPath), 'backups')
+  let resolvedBackupDir: string
+  if (parsed.BACKUP_DIR) {
+    resolvedBackupDir = resolve(parsed.BACKUP_DIR)
+  } else if (resolvedDbPath === ':memory:') {
+    resolvedBackupDir = resolve('./data/backups')
+  } else {
+    resolvedBackupDir = resolve(dirname(resolvedDbPath), 'backups')
+  }
 
   mkdirSync(resolvedBackupDir, { recursive: true })
 
