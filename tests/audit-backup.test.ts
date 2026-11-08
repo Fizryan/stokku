@@ -212,7 +212,7 @@ describe('Audit Trail & Disaster Recovery Backup Manager (Governance & Integrity
       method: 'POST',
       json: {
         paymentMethod: 'CASH',
-        paidAmount: 20_000,
+        paidAmount: 22_200,
         discountAmount: 0,
         customerId: customerRes.body.data.id,
         items: [{ productId: productRes.body.data.id, qty: 2 }],

@@ -86,7 +86,8 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     // Valid checkout:
     // 3x SNACK-01 (3 * 12.000 = 36.000, cost = 24.000)
     // 2x SNACK-02 (2 * 22.000 = 44.000, cost = 30.000)
-    // Subtotal = 80.000, Discount = 5.000 -> Total = 75.000
+    // Subtotal = 80.000, Discount = 5.000 -> DPP = 75.000
+    // Pajak 11% = 8.250 -> Total = 83.250
     // Gross profit = (36.000 - 24.000) + (44.000 - 30.000) - 5.000 = 12.000 + 14.000 - 5.000 = 21.000
     const saleRes = await owner.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',
@@ -107,8 +108,9 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     assert.match(sale.invoiceNumber, /^INV-\d{8}-0001$/)
     assert.equal(sale.subtotalAmount, 80_000)
     assert.equal(sale.discountAmount, 5_000)
-    assert.equal(sale.totalAmount, 75_000)
-    assert.equal(sale.changeAmount, 25_000)
+    assert.equal(sale.taxAmount, 8_250)
+    assert.equal(sale.totalAmount, 83_250)
+    assert.equal(sale.changeAmount, 16_750)
     assert.equal(sale.grossProfitAmount, 21_000)
 
     // Verify stocks were atomically deducted (20 -> 17 and 10 -> 8)
@@ -152,7 +154,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     const dashRes = await owner.requestJson<DashboardMetricsDTO>('/api/dashboard?days=14')
     assert.equal(dashRes.status, 200)
     assert(dashRes.body.ok)
-    assert.equal(dashRes.body.data.todayRevenueAmount, 75_000)
+    assert.equal(dashRes.body.data.todayRevenueAmount, 83_250)
     assert.equal(dashRes.body.data.todayGrossProfitAmount, 21_000)
 
     // Verify CSV export works and streams UTF-8 BOM + invoice row
@@ -192,5 +194,63 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
       },
     )
     assert.equal(doubleVoidRes.status, 409)
+  })
+
+  it('computes tax on (subtotal - discount) with Math.round rounding', async () => {
+    harness = createTestHarness()
+    const owner = harness.createClient()
+
+    await owner.requestJson<{ user: UserDTO }>('/api/auth/setup', {
+      method: 'POST',
+      json: {
+        fullName: 'Owner Toko',
+        username: 'owner',
+        password: 'password123',
+      },
+    })
+
+    const pRes = await owner.requestJson<ProductDTO>('/api/products', {
+      method: 'POST',
+      json: {
+        sku: 'ROUND-01',
+        name: 'Produk Uji Pembulatan Pajak',
+        categoryId: null,
+        unit: 'pcs',
+        costPrice: 5_000,
+        sellPrice: 10_000,
+        minStockQty: 0,
+        initialStock: 10,
+      },
+    })
+    assert(pRes.body.ok)
+    const product = pRes.body.data
+
+    const openShiftRes = await owner.requestJson('/api/shifts/open', {
+      method: 'POST',
+      json: { openingCash: 50_000 },
+    })
+    assert.equal(openShiftRes.status, 201)
+
+    // Subtotal = 10.000, Discount = 950 -> DPP = 9.050
+    // Pajak = Math.round(9.050 * 0.11) = Math.round(995.5) = 996
+    // Total = 9.050 + 996 = 10.046
+    const saleRes = await owner.requestJson<SaleDetailDTO>('/api/sales', {
+      method: 'POST',
+      json: {
+        items: [{ productId: product.id, qty: 1 }],
+        discountAmount: 950,
+        paymentMethod: 'CASH',
+        paidAmount: 20_000,
+        customerName: null,
+      },
+    })
+    assert.equal(saleRes.status, 201)
+    assert(saleRes.body.ok)
+    const sale = saleRes.body.data
+    assert.equal(sale.subtotalAmount, 10_000)
+    assert.equal(sale.discountAmount, 950)
+    assert.equal(sale.taxAmount, 996)
+    assert.equal(sale.totalAmount, 10_046)
+    assert.equal(sale.changeAmount, 9_954)
   })
 })

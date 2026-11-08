@@ -233,7 +233,7 @@ describe('Cash Shift & Cash Drawer Management', () => {
         items: [{ productId: product.id, qty: 1 }],
         discountAmount: 0,
         paymentMethod: 'QRIS',
-        paidAmount: 18_000,
+        paidAmount: 19_980,
         customerName: 'Pelanggan Non-Tunai',
       },
     })
@@ -242,8 +242,8 @@ describe('Cash Shift & Cash Drawer Management', () => {
     assert.equal(qrisSale.body.data.shiftId, activeShift.id)
 
     // 12. Check live X-Report via /api/shifts/current
-    // Expected Cash: 200.000 (modal) + 50.000 (cash in) - 20.000 (cash out) + 36.000 (cash sale) = 266.000
-    // QRIS sale (18.000) tracked in totalNonCashSales, does NOT inflate physical cash drawer!
+    // Expected Cash: 200.000 (modal) + 50.000 (cash in) - 20.000 (cash out) + 39.960 (cash sale incl. pajak) = 269.940
+    // QRIS sale (19.980 incl. pajak) tracked in totalNonCashSales, does NOT inflate physical cash drawer!
     const liveStatus =
       await cashierClient.requestJson<CurrentShiftStatusDTO>('/api/shifts/current')
     assert.equal(liveStatus.status, 200)
@@ -253,21 +253,21 @@ describe('Cash Shift & Cash Drawer Management', () => {
     assert.equal(current.openingCash, 200_000)
     assert.equal(current.totalCashIn, 50_000)
     assert.equal(current.totalCashOut, 20_000)
-    assert.equal(current.totalCashSales, 36_000)
-    assert.equal(current.totalNonCashSales, 18_000)
+    assert.equal(current.totalCashSales, 39_960)
+    assert.equal(current.totalNonCashSales, 19_980)
     assert.equal(current.transactionCount, 2)
-    assert.equal(current.expectedCash, 266_000)
+    assert.equal(current.expectedCash, 269_960)
     assert.equal(current.movements.length, 2)
 
     // 13. Close Shift with Physical Cash Count
-    // Cashier counts actual cash in drawer = Rp 265.000 (selisih minus Rp 1.000)
+    // Cashier counts actual cash in drawer = Rp 265.000 (selisih minus Rp 4.960)
     const closeRes = await cashierClient.requestJson<CashShiftDetailDTO>(
       '/api/shifts/close',
       {
         method: 'POST',
         json: {
           actualCash: 265_000,
-          notes: 'Selisih kurang Rp 1.000 karena pembulatan permen koin',
+          notes: 'Selisih kurang karena pembulatan permen koin',
         },
       },
     )
@@ -276,8 +276,8 @@ describe('Cash Shift & Cash Drawer Management', () => {
     const closed = closeRes.body.data
     assert.equal(closed.status, 'CLOSED')
     assert.equal(closed.closingCash, 265_000)
-    assert.equal(closed.expectedCash, 266_000)
-    assert.equal(closed.cashDifference, -1_000)
+    assert.equal(closed.expectedCash, 269_960)
+    assert.equal(closed.cashDifference, -4_960)
     assert.ok(closed.closedAt !== null)
 
     // 14. Invariant: After shift closed, cashier cannot checkout or close again
@@ -319,6 +319,6 @@ describe('Cash Shift & Cash Drawer Management', () => {
     assert.equal(ownerShiftDetail.status, 200)
     assert(ownerShiftDetail.body.ok)
     assert.equal(ownerShiftDetail.body.data.cashierName, 'Budi Kasir')
-    assert.equal(ownerShiftDetail.body.data.cashDifference, -1_000)
+    assert.equal(ownerShiftDetail.body.data.cashDifference, -4_960)
   })
 })
