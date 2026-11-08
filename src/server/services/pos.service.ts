@@ -1,5 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite'
-import { hasPermission, LOYALTY_RULES } from '../../shared/constants.js'
+import {
+  getLoyaltyTier,
+  getPointExpiryIso,
+  hasPermission,
+  LOYALTY_RULES,
+} from '../../shared/constants.js'
 import type {
   CheckoutSaleInput,
   SalesQueryInput,
@@ -114,13 +119,14 @@ export class PosService implements PosServiceContract {
         })
       }
 
-      // Customer and Loyalty Points Resolution
       let customerId: number | null = null
       let resolvedCustomerName: string | null = input.customerName ?? null
       let pointsRedeemed = 0
       let pointsDiscountAmount = 0
+      let bonusPointsPercent = 0
 
       if (input.customerId && this.deps.customerRepo) {
+        this.deps.customerRepo.expirePointsInTx(input.customerId, actor.id, nowIso)
         const customer = this.deps.customerRepo.findById(input.customerId)
         if (!customer) {
           throw AppError.notFound(
@@ -135,6 +141,7 @@ export class PosService implements PosServiceContract {
 
         customerId = customer.id
         resolvedCustomerName = customer.name
+        bonusPointsPercent = getLoyaltyTier(customer.totalSpend).bonusPointsPercent
 
         if (input.pointsRedeemed > 0) {
           if (input.pointsRedeemed > customer.pointsBalance) {
@@ -176,10 +183,11 @@ export class PosService implements PosServiceContract {
       const changeAmount = input.paidAmount - totalAmount
       const invoiceNumber = this.deps.saleRepo.generateNextInvoiceNumber(now)
 
-      // Calculate earned points from net total amount
-      const pointsEarned = customerId
+      const basePointsEarned = customerId
         ? Math.floor(totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
         : 0
+      const pointsEarned =
+        basePointsEarned + Math.floor((basePointsEarned * bonusPointsPercent) / 100)
 
       const saleId = this.deps.saleRepo.createSaleRecord({
         shiftId: activeShift.id,
@@ -219,17 +227,11 @@ export class PosService implements PosServiceContract {
         })
       }
 
-      // Mutate customer loyalty balance and audit log
       if (customerId && this.deps.customerRepo) {
         const netPointsDelta = pointsEarned - pointsRedeemed
-        this.deps.customerRepo.incrementSpendAndVisitInTx(
-          customerId,
-          totalAmount,
-          netPointsDelta,
-        )
 
         if (pointsRedeemed > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
+          const mutationId = this.deps.customerRepo.recordPointMutationInTx({
             customerId,
             points: -pointsRedeemed,
             mutationType: 'REDEEMED',
@@ -239,10 +241,23 @@ export class PosService implements PosServiceContract {
             actorUserId: actor.id,
             nowIso,
           })
+          if (
+            !this.deps.customerRepo.consumePointsInTx(
+              customerId,
+              pointsRedeemed,
+              mutationId,
+              nowIso,
+            )
+          ) {
+            throw AppError.conflict(
+              'Saldo poin berubah saat checkout. Silakan coba lagi.',
+            )
+          }
         }
 
         if (pointsEarned > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
+          const expiresAt = getPointExpiryIso(now)
+          const mutationId = this.deps.customerRepo.recordPointMutationInTx({
             customerId,
             points: pointsEarned,
             mutationType: 'EARNED',
@@ -251,7 +266,24 @@ export class PosService implements PosServiceContract {
             description: `Perolehan poin belanja — ${invoiceNumber}`,
             actorUserId: actor.id,
             nowIso,
+            expiresAt,
           })
+          this.deps.customerRepo.createPointLotInTx({
+            customerId,
+            sourceMutationId: mutationId,
+            points: pointsEarned,
+            expiresAt,
+          })
+        }
+
+        if (
+          !this.deps.customerRepo.incrementSpendAndVisitInTx(
+            customerId,
+            totalAmount,
+            netPointsDelta,
+          )
+        ) {
+          throw AppError.conflict('Gagal memperbarui saldo poin pelanggan.')
         }
       }
 
@@ -350,39 +382,91 @@ export class PosService implements PosServiceContract {
         })
       }
 
-      // Revert customer loyalty points & spend metrics
       if (existing.customerId && this.deps.customerRepo) {
-        const netPointsReversal = existing.pointsRedeemed - existing.pointsEarned
-        this.deps.customerRepo.decrementSpendAndVisitInTx(
-          existing.customerId,
-          existing.totalAmount,
-          netPointsReversal,
-        )
+        let restoredPoints = 0
+        this.deps.customerRepo.expirePointsInTx(existing.customerId, actor.id, nowIso)
 
         if (existing.pointsRedeemed > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
-            customerId: existing.customerId,
-            points: existing.pointsRedeemed,
-            mutationType: 'VOID_RESTORED',
-            referenceType: 'SALE',
-            referenceId: saleId,
-            description: `Pengembalian ${existing.pointsRedeemed} poin void transaksi — ${existing.invoiceNumber}`,
-            actorUserId: actor.id,
-            nowIso,
-          })
+          const redeemedMutationId = this.deps.customerRepo.findSalePointMutationId(
+            existing.customerId,
+            saleId,
+            'REDEEMED',
+          )
+          const restorablePoints = redeemedMutationId
+            ? this.deps.customerRepo.getRestorablePointsInTx(redeemedMutationId, nowIso)
+            : existing.pointsRedeemed
+          const restorationMutationId =
+            restorablePoints > 0
+              ? this.deps.customerRepo.recordPointMutationInTx({
+                  customerId: existing.customerId,
+                  points: restorablePoints,
+                  mutationType: 'VOID_RESTORED',
+                  referenceType: 'SALE',
+                  referenceId: saleId,
+                  description: `Pengembalian ${restorablePoints} poin void transaksi — ${existing.invoiceNumber}`,
+                  actorUserId: actor.id,
+                  nowIso,
+                })
+              : null
+          restoredPoints =
+            restorationMutationId === null
+              ? 0
+              : this.deps.customerRepo.restorePointsInTx({
+                  sourceMutationId: redeemedMutationId,
+                  restorationMutationId,
+                  fallbackCustomerId: existing.customerId,
+                  fallbackPoints: restorablePoints,
+                  nowIso,
+                  fallbackExpiresAt: getPointExpiryIso(new Date(nowIso)),
+                })
+          if (restoredPoints !== restorablePoints) {
+            throw AppError.conflict(
+              'Gagal memulihkan poin dari transaksi yang dibatalkan.',
+            )
+          }
         }
 
+        const reversiblePoints = this.deps.customerRepo.getReversibleEarnedPointsInTx(
+          existing.customerId,
+          saleId,
+          existing.pointsEarned,
+        )
+        let reversedPoints = 0
         if (existing.pointsEarned > 0) {
-          this.deps.customerRepo.recordPointMutationInTx({
+          reversedPoints = reversiblePoints
+          const reversalMutationId = this.deps.customerRepo.recordPointMutationInTx({
             customerId: existing.customerId,
-            points: -existing.pointsEarned,
+            points: -reversedPoints,
             mutationType: 'VOID_REVERSED',
             referenceType: 'SALE',
             referenceId: saleId,
-            description: `Penarikan ${existing.pointsEarned} poin void transaksi — ${existing.invoiceNumber}`,
+            description: `Penarikan ${reversedPoints} poin void transaksi — ${existing.invoiceNumber}`,
             actorUserId: actor.id,
             nowIso,
           })
+          if (
+            reversedPoints > 0 &&
+            !this.deps.customerRepo.reverseEarnedPointsInTx({
+              customerId: existing.customerId,
+              saleId,
+              points: reversedPoints,
+              mutationId: reversalMutationId,
+              nowIso,
+            })
+          ) {
+            throw AppError.conflict('Gagal menarik poin dari transaksi yang dibatalkan.')
+          }
+        }
+
+        const netPointsReversal = restoredPoints - reversedPoints
+        if (
+          !this.deps.customerRepo.decrementSpendAndVisitInTx(
+            existing.customerId,
+            existing.totalAmount,
+            netPointsReversal,
+          )
+        ) {
+          throw AppError.conflict('Gagal memperbarui saldo poin setelah pembatalan.')
         }
       }
 

@@ -235,13 +235,16 @@ export function PosCartPanel(props: PosCartPanelProps) {
                       <p class="text-[11px] font-mono text-m3-on-surface-variant">
                         {selectedCustomer.phone}
                       </p>
+                      <p class="text-[11px] text-m3-primary font-medium">
+                        Tier {selectedCustomer.loyaltyTier.name} · bonus poin{' '}
+                        {selectedCustomer.loyaltyTier.bonusPointsPercent}%
+                      </p>
                     </div>
                     <Badge tone="primary">
                       ⭐ {formatInteger(selectedCustomer.pointsBalance)} Poin
                     </Badge>
                   </div>
 
-                  {/* Points Redemption Slider / Input */}
                   {selectedCustomer.pointsBalance > 0 && (
                     <div class="pt-2 border-t border-m3-outline-variant/50 space-y-1.5">
                       <div class="flex items-center justify-between text-[11px]">

@@ -1,5 +1,6 @@
 import type {
   AuditActionType,
+  LoyaltyTierName,
   MovementReferenceType,
   MovementType,
   PaymentMethod,
@@ -274,6 +275,12 @@ export interface CustomerDTO {
   readonly pointsBalance: number
   readonly totalSpend: number
   readonly visitCount: number
+  readonly loyaltyTier: {
+    readonly name: LoyaltyTierName
+    readonly minimumSpend: number
+    readonly bonusPointsPercent: number
+    readonly reason: string
+  }
   readonly isActive: boolean
   readonly createdAt: string
 }
@@ -289,6 +296,7 @@ export interface CustomerPointMutationDTO {
   readonly actorUserId: number
   readonly actorName: string
   readonly createdAt: string
+  readonly expiresAt: string | null
 }
 
 export interface AuditLogDTO {

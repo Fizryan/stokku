@@ -33,7 +33,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
   const [mutations, setMutations] = useState<readonly CustomerPointMutationDTO[]>([])
   const [loadingMutations, setLoadingMutations] = useState(false)
 
-  // Points adjustment form state
   const [showAdjustForm, setShowAdjustForm] = useState(false)
   const [adjustPointsValue, setAdjustPointsValue] = useState('')
   const [adjustDescription, setAdjustDescription] = useState('')
@@ -117,7 +116,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
       }
     >
       <div class="space-y-4">
-        {/* Top 3 Stat Cards */}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card class="p-3 bg-m3-surface-container-low border border-m3-outline-variant">
             <div class="flex items-center gap-1.5 text-xs text-m3-on-surface-variant font-medium">
@@ -164,7 +162,23 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           </Card>
         </div>
 
-        {/* Identity & Contact Details */}
+        <Card class="p-3 bg-m3-surface-container-low border border-m3-outline-variant">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-xs text-m3-on-surface-variant font-medium">Tier Loyalitas</p>
+              <p class="text-lg font-bold text-m3-primary mt-0.5">
+                {customer.loyaltyTier.name}
+              </p>
+            </div>
+            <Badge tone="success">
+              Bonus poin {customer.loyaltyTier.bonusPointsPercent}%
+            </Badge>
+          </div>
+          <p class="text-[11px] text-m3-on-surface-variant mt-1">
+            {customer.loyaltyTier.reason}
+          </p>
+        </Card>
+
         <div class="p-3 bg-m3-surface-container-low border border-m3-outline-variant rounded-xl text-xs grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
             <span class="text-m3-on-surface-variant">No. Telepon / WhatsApp:</span>
@@ -192,7 +206,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           )}
         </div>
 
-        {/* Owner Points Adjustment Action */}
         {isOwner && (
           <div class="border border-m3-outline-variant rounded-xl p-3 bg-m3-surface-container-low/40">
             <div class="flex items-center justify-between">
@@ -261,7 +274,6 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
           </div>
         )}
 
-        {/* Mutation Ledger History */}
         <div>
           <div class="flex items-center justify-between mb-2">
             <h4 class="text-xs font-bold text-m3-on-surface-variant uppercase tracking-wider">
@@ -295,6 +307,7 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
                     <th class="py-2.5 px-3">Jenis Mutasi</th>
                     <th class="py-2.5 px-3 text-right">Poin</th>
                     <th class="py-2.5 px-3">Keterangan</th>
+                    <th class="py-2.5 px-3">Berlaku hingga</th>
                     <th class="py-2.5 px-3">Operator</th>
                   </tr>
                 </thead>
@@ -325,6 +338,9 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
                           </span>
                         </td>
                         <td class="py-2 px-3 text-m3-on-surface">{m.description}</td>
+                        <td class="py-2 px-3 text-m3-on-surface-variant whitespace-nowrap">
+                          {m.expiresAt ? formatDateTime(m.expiresAt) : '-'}
+                        </td>
                         <td class="py-2 px-3 text-m3-on-surface-variant whitespace-nowrap">
                           {m.actorName}
                         </td>

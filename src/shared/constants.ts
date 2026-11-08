@@ -85,6 +85,7 @@ export const POINT_MUTATION_TYPES = [
   'VOID_REVERSED',
   'VOID_RESTORED',
   'ADJUSTMENT',
+  'EXPIRED',
 ] as const
 export type PointMutationType = (typeof POINT_MUTATION_TYPES)[number]
 
@@ -94,12 +95,34 @@ export const POINT_MUTATION_TYPE_LABELS: Readonly<Record<PointMutationType, stri
   VOID_REVERSED: 'Pembatalan Transaksi (Poin Ditarik)',
   VOID_RESTORED: 'Pembatalan Transaksi (Poin Dikembalikan)',
   ADJUSTMENT: 'Penyesuaian Manual',
+  EXPIRED: 'Poin Kedaluwarsa',
 }
 
 export const LOYALTY_RULES = {
   SPEND_PER_POINT: 10_000,
   POINT_VALUE_IN_RUPIAH: 100,
+  POINT_VALIDITY_DAYS: 365,
 } as const
+
+export function getPointExpiryIso(now: Date): string {
+  return new Date(
+    now.getTime() + LOYALTY_RULES.POINT_VALIDITY_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
+}
+
+export const LOYALTY_TIERS = [
+  { name: 'Reguler', minimumSpend: 0, bonusPointsPercent: 0 },
+  { name: 'Silver', minimumSpend: 1_000_000, bonusPointsPercent: 10 },
+  { name: 'Gold', minimumSpend: 5_000_000, bonusPointsPercent: 20 },
+] as const
+
+export type LoyaltyTierName = (typeof LOYALTY_TIERS)[number]['name']
+
+export function getLoyaltyTier(totalSpend: number) {
+  return LOYALTY_TIERS.reduce((selected, tier) =>
+    totalSpend >= tier.minimumSpend ? tier : selected,
+  )
+}
 
 export const AUDIT_ACTION_TYPES = [
   'USER_ROLE_CHANGED',
