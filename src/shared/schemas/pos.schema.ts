@@ -68,8 +68,19 @@ export const dashboardQuerySchema = z.object({
   days: intQueryParam(14, 7, 90),
 })
 
+export const receiptVerifyQuerySchema = z.object({
+  signature: z
+    .string({ error: 'Parameter signature wajib diisi.' })
+    .min(1, 'Signature tidak boleh kosong.')
+    .regex(
+      /^SIG-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/,
+      'Format signature tidak valid. Contoh: SIG-XXXX-XXXX-XXXX-XXXX',
+    ),
+})
+
 export type CheckoutSaleInput = z.infer<typeof checkoutSaleSchema>
 export type VoidSaleInput = z.infer<typeof voidSaleSchema>
 export type SalesQueryInput = z.infer<typeof salesQuerySchema>
 export type SalesExportQueryInput = z.infer<typeof salesExportQuerySchema>
 export type DashboardQueryInput = z.infer<typeof dashboardQuerySchema>
+export type ReceiptVerifyQueryInput = z.infer<typeof receiptVerifyQuerySchema>
