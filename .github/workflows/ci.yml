@@ -75,6 +75,25 @@ jobs:
       - name: Run automated integration tests
         run: pnpm test
 
+  sonarcloud:
+    name: SonarCloud Quality Gate
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository (full git history for blame & metrics)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Cloud Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     name: Production Build Verification
     needs: test
@@ -148,7 +167,7 @@ jobs:
             if [ "$STATUS" = "200" ]; then
               BODY=$(curl -s http://127.0.0.1:3000/api/health)
               echo "Healthcheck response: $BODY"
-              if echo "$BODY" | grep -q '"status":"HEALTHY"'; then
+              if echo "$BODY" | grep -q '"status":"ok"'; then
                 echo "Stokku server is healthy and responding with 200 OK!"
                 UNTIL_READY=true
                 break
