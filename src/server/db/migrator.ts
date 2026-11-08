@@ -7,6 +7,7 @@ import { migration002CashShifts } from './migrations/002_cash_shifts.js'
 import { migration003PurchasesAndSuppliers } from './migrations/003_purchases_and_suppliers.js'
 import { migration004CustomersAndLoyalty } from './migrations/004_customers_and_loyalty.js'
 import { migration005AuditLogs } from './migrations/005_audit_logs.js'
+import { migration006BatchesReplenishmentBackups } from './migrations/006_batches_replenishment_backups.js'
 import { runInImmediateTransaction } from './transaction.js'
 
 const ALL_MIGRATIONS: readonly DatabaseMigration[] = [
@@ -15,6 +16,7 @@ const ALL_MIGRATIONS: readonly DatabaseMigration[] = [
   migration003PurchasesAndSuppliers,
   migration004CustomersAndLoyalty,
   migration005AuditLogs,
+  migration006BatchesReplenishmentBackups,
 ]
 
 export function runDatabaseMigrations(db: DatabaseSync): void {
