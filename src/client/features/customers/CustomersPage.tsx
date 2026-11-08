@@ -15,6 +15,7 @@ import { IconHeart, IconPlus, IconRefresh, IconStar } from '../../components/ui/
 import { Pagination } from '../../components/ui/Pagination.js'
 import { SelectField, type SelectOption } from '../../components/ui/SelectField.js'
 import { TextField } from '../../components/ui/TextField.js'
+import { usePolling } from '../../hooks/use-polling.js'
 import { useAuth } from '../../stores/auth.store.js'
 import { useToast } from '../../stores/toast.store.js'
 import { CustomerDetailModal } from './CustomerDetailModal.js'
@@ -53,8 +54,8 @@ export function CustomersPage() {
   }, [])
 
   const loadCustomers = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoading(true)
+    async (signal?: AbortSignal, silent = false) => {
+      if (!silent) setLoading(true)
       try {
         const res = await api.customers.list(
           {
@@ -69,12 +70,13 @@ export function CustomersPage() {
         setMeta(res.meta)
       } catch (err) {
         if (signal?.aborted || isAbortError(err)) return
+        if (silent) return
         showToast(
           err instanceof ClientApiError ? err.message : 'Gagal memuat daftar pelanggan.',
           'error',
         )
       } finally {
-        if (!signal?.aborted) {
+        if (!signal?.aborted && !silent) {
           setLoading(false)
         }
       }
@@ -87,6 +89,8 @@ export function CustomersPage() {
     void loadCustomers(controller.signal)
     return () => controller.abort()
   }, [loadCustomers])
+
+  usePolling(() => loadCustomers(undefined, true), 5000)
 
   const handleResetFilters = () => {
     setSearch('')

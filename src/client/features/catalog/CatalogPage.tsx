@@ -17,6 +17,7 @@ import {
 import { Pagination } from '../../components/ui/Pagination.js'
 import { SearchInput } from '../../components/ui/SearchInput.js'
 import { SelectField } from '../../components/ui/SelectField.js'
+import { usePolling } from '../../hooks/use-polling.js'
 import { useAuth } from '../../stores/auth.store.js'
 import { useToast } from '../../stores/toast.store.js'
 import { StockMovementModal } from '../inventory/StockMovementModal.js'
@@ -57,8 +58,8 @@ export function CatalogPage() {
   }, [])
 
   const loadProducts = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoading(true)
+    async (signal?: AbortSignal, silent = false) => {
+      if (!silent) setLoading(true)
       try {
         const result = await api.products.list(
           {
@@ -76,12 +77,13 @@ export function CatalogPage() {
         setProductsData(result)
       } catch (err) {
         if (signal?.aborted || isAbortError(err)) return
+        if (silent) return
         showToast(
           err instanceof ClientApiError ? err.message : 'Gagal memuat katalog produk.',
           'error',
         )
       } finally {
-        if (!signal?.aborted) {
+        if (!signal?.aborted && !silent) {
           setLoading(false)
         }
       }
@@ -98,6 +100,8 @@ export function CatalogPage() {
     void loadProducts(controller.signal)
     return () => controller.abort()
   }, [loadProducts])
+
+  usePolling(() => loadProducts(undefined, true), 5000)
 
   const products = productsData?.items ?? []
   const showCostColumn = products.some((p) => p.costPrice !== null) || canManageCatalog

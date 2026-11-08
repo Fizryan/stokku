@@ -23,6 +23,7 @@ import { IconInventory, IconPlus } from '../../components/ui/Icons.js'
 import { Pagination } from '../../components/ui/Pagination.js'
 import { SelectField } from '../../components/ui/SelectField.js'
 import { TextField } from '../../components/ui/TextField.js'
+import { usePolling } from '../../hooks/use-polling.js'
 import { useAuth } from '../../stores/auth.store.js'
 import { useToast } from '../../stores/toast.store.js'
 import { StockMovementModal } from './StockMovementModal.js'
@@ -63,8 +64,8 @@ export function InventoryPage() {
   }, [])
 
   const loadMovements = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoading(true)
+    async (signal?: AbortSignal, silent = false) => {
+      if (!silent) setLoading(true)
       try {
         const res = await api.inventory.listMovements(
           {
@@ -80,6 +81,7 @@ export function InventoryPage() {
         setMovementsData(res)
       } catch (err) {
         if (signal?.aborted || isAbortError(err)) return
+        if (silent) return
         showToast(
           err instanceof ClientApiError
             ? err.message
@@ -87,7 +89,7 @@ export function InventoryPage() {
           'error',
         )
       } finally {
-        if (!signal?.aborted) {
+        if (!signal?.aborted && !silent) {
           setLoading(false)
         }
       }
@@ -104,6 +106,8 @@ export function InventoryPage() {
     void loadMovements(controller.signal)
     return () => controller.abort()
   }, [loadMovements])
+
+  usePolling(() => loadMovements(undefined, true), 5000)
 
   const movements = movementsData?.items ?? []
 

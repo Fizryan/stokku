@@ -18,6 +18,7 @@ import {
   IconRefresh,
 } from '../../components/ui/Icons.js'
 import { StatCard } from '../../components/ui/StatCard.js'
+import { usePolling } from '../../hooks/use-polling.js'
 import { useAuth } from '../../stores/auth.store.js'
 import { useRouter } from '../../stores/router.store.js'
 import { useToast } from '../../stores/toast.store.js'
@@ -34,13 +35,14 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   const loadDashboard = useCallback(
-    async (selectedDays: number, signal?: AbortSignal) => {
-      setLoading(true)
+    async (selectedDays: number, signal?: AbortSignal, silent = false) => {
+      if (!silent) setLoading(true)
       try {
         const data = await api.dashboard.getMetrics(selectedDays, signal)
         setMetrics(data)
       } catch (err) {
         if (signal?.aborted || isAbortError(err)) return
+        if (silent) return
         showToast(
           err instanceof ClientApiError
             ? err.message
@@ -48,7 +50,7 @@ export function DashboardPage() {
           'error',
         )
       } finally {
-        if (!signal?.aborted) {
+        if (!signal?.aborted && !silent) {
           setLoading(false)
         }
       }
@@ -61,6 +63,8 @@ export function DashboardPage() {
     void loadDashboard(days, controller.signal)
     return () => controller.abort()
   }, [days, loadDashboard])
+
+  usePolling(() => loadDashboard(days, undefined, true), 5000)
 
   const canSeeFinancials = can('dashboard:financials')
 
