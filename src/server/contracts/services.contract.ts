@@ -50,6 +50,7 @@ import type {
   ProductDTO,
   PurchaseDetailDTO,
   PurchaseSummaryDTO,
+  ReceiptVerificationResult,
   ReplenishmentRecommendationDTO,
   SaleDetailDTO,
   SaleSummaryDTO,
@@ -129,6 +130,11 @@ export interface PosServiceContract {
   listSales(actor: UserDTO, query: SalesQueryInput): PaginatedResult<SaleSummaryDTO>
   getSaleDetail(actor: UserDTO, saleId: number): SaleDetailDTO
   voidSale(actor: UserDTO, saleId: number, input: VoidSaleInput): SaleDetailDTO
+  verifyReceipt(
+    actor: UserDTO,
+    saleId: number,
+    signature: string,
+  ): ReceiptVerificationResult
 }
 
 export interface ShiftServiceContract {
