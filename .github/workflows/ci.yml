@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - dev-fizryan
+      - dev-fathir
   pull_request:
     branches:
       - master
       - dev-fizryan
+      - dev-fathir
   workflow_dispatch:
 
 concurrency:
