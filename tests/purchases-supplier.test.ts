@@ -5,6 +5,7 @@ import type {
   ProductDTO,
   PurchaseDetailDTO,
   PurchaseSummaryDTO,
+  ReplenishmentRecommendationDTO,
   StockMovementDTO,
   SupplierDTO,
   UserDTO,
@@ -101,6 +102,7 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
           phone: '081234567890',
           address: 'Kawasan Industri Pulogadung Blok B No. 4',
           notes: 'Pemasok utama sembako dan makanan ringan',
+          leadTimeDays: 14,
         },
       },
     )
@@ -109,6 +111,7 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
     const supplier = createSupplierRes.body.data
     assert.equal(supplier.name, 'PT Sumber Pangan Sejahtera')
     assert.equal(supplier.isActive, true)
+    assert.equal(supplier.leadTimeDays, 14)
 
     // Invariant: Duplicate supplier name is rejected (409 Conflict)
     const dupSupplierRes = await warehouseClient.requestJson<SupplierDTO>(
@@ -163,6 +166,32 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
     assert(prodBRes.body.ok)
     const prodB = prodBRes.body.data
 
+    const prodCRes = await ownerClient.requestJson<ProductDTO>('/api/products', {
+      method: 'POST',
+      json: {
+        sku: 'TEH-01',
+        name: 'Teh Celup',
+        unit: 'box',
+        costPrice: 4_000,
+        sellPrice: 6_000,
+        minStockQty: 5,
+        initialStock: 0,
+      },
+    })
+    assert(prodCRes.body.ok)
+    const prodCId = prodCRes.body.data.id
+
+    const recommendationsRes = await warehouseClient.requestJson<
+      ReplenishmentRecommendationDTO[]
+    >(`/api/purchases/recommendations?supplierId=${supplier.id}`)
+    assert.equal(recommendationsRes.status, 200)
+    assert(recommendationsRes.body.ok)
+    const recommendedProduct = recommendationsRes.body.data.find(
+      (item) => item.productId === prodCId,
+    )
+    assert.equal(recommendedProduct?.recommendedQty, 5)
+    assert.equal(recommendedProduct?.leadTimeDays, 14)
+
     // 6. Record Multi-Item Purchase Invoice (Faktur Pembelian)
     // Product A: restock 20 pcs @ 13.000
     // Weighted Average HPP Calculation for Product A:
@@ -173,6 +202,9 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
     // Product B: restock 15 pcs @ 24.000
     // Total Invoice = (20 * 13.000) + (15 * 24.000) = 260.000 + 360.000 = 620.000
     const invoiceNumber = 'FAKTUR-SPS-20261028-001'
+    const expiryDate = new Date()
+    expiryDate.setDate(expiryDate.getDate() + 10)
+    const expiryDateText = expiryDate.toISOString().slice(0, 10)
     const purchaseRes = await warehouseClient.requestJson<PurchaseDetailDTO>(
       '/api/purchases',
       {
@@ -184,7 +216,12 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
           dueDate: '2026-11-28',
           notes: 'Pengiriman via truk logistik armada 2',
           items: [
-            { productId: prodA.id, qty: 20, unitCost: 13_000 },
+            {
+              productId: prodA.id,
+              qty: 20,
+              unitCost: 13_000,
+              expiryDate: expiryDateText,
+            },
             { productId: prodB.id, qty: 15, unitCost: 24_000 },
           ],
         },
@@ -203,6 +240,24 @@ describe('Supplier & Purchase Invoicing Engine (Purchasing & SSOT Weighted-Avera
     assert.equal(purchase.itemCount, 2)
     assert.equal(purchase.totalQty, 35)
     assert.equal(purchase.items.length, 2)
+    assert.equal(
+      purchase.items.find((item) => item.productId === prodA.id)?.expiryDate,
+      expiryDateText,
+    )
+
+    const expiringRes = await warehouseClient.requestJson<
+      Array<{ productId: number; expiryDate: string; qty: number }>
+    >('/api/inventory/expiring')
+    assert.equal(expiringRes.status, 200)
+    assert(expiringRes.body.ok)
+    assert(
+      expiringRes.body.data.some(
+        (batch) =>
+          batch.productId === prodA.id &&
+          batch.expiryDate === expiryDateText &&
+          batch.qty === 20,
+      ),
+    )
 
     // 7. Verify Product A Stock and Weighted-Average HPP
     const updatedProdA = await ownerClient.requestJson<ProductDTO>(

@@ -15,15 +15,17 @@ import { runInImmediateTransaction } from '../db/transaction.js'
 import { AppError } from '../errors/app-error.js'
 import type { ProductRepository } from '../repositories/product.repo.js'
 import type { PurchaseRepository } from '../repositories/purchase.repo.js'
-import type { StockMovementRepository } from '../repositories/stock-movement.repo.js'
+import type { ReplenishmentRepository } from '../repositories/replenishment.repo.js'
 import type { SupplierRepository } from '../repositories/supplier.repo.js'
+import type { InventoryService } from './inventory.service.js'
 
 export interface PurchaseServiceDeps {
   readonly db: DatabaseSync
   readonly purchaseRepo: PurchaseRepository
   readonly supplierRepo: SupplierRepository
   readonly productRepo: ProductRepository
-  readonly stockMovementRepo: StockMovementRepository
+  readonly inventoryService: InventoryService
+  readonly replenishmentRepo: ReplenishmentRepository
 }
 
 export class PurchaseService implements PurchaseServiceContract {
@@ -67,6 +69,7 @@ export class PurchaseService implements PurchaseServiceContract {
         qty: number
         unitCost: number
         lineSubtotal: number
+        expiryDate: string | null
       }> = []
 
       for (const item of sortedItems) {
@@ -91,6 +94,7 @@ export class PurchaseService implements PurchaseServiceContract {
           qty: item.qty,
           unitCost: item.unitCost,
           lineSubtotal,
+          expiryDate: item.expiryDate ?? null,
         })
       }
 
@@ -106,7 +110,7 @@ export class PurchaseService implements PurchaseServiceContract {
         items: resolvedItems,
       })
 
-      // Update SSOT Immutable Stock Ledger & Weighted-Average HPP for each item
+      // Update the stock ledger and corresponding batch in the same transaction.
       for (const item of sortedItems) {
         const product = this.deps.productRepo.findById(item.productId)
         if (!product) {
@@ -115,32 +119,15 @@ export class PurchaseService implements PurchaseServiceContract {
           )
         }
 
-        const qtyBefore = product.stockQty
-        const qtyChange = item.qty
-        const qtyAfter = qtyBefore + qtyChange
-        const incomingCost = item.unitCost
-
-        const weightedAvgCost =
-          qtyBefore > 0
-            ? Math.round(
-                (qtyBefore * product.costPrice + qtyChange * incomingCost) / qtyAfter,
-              )
-            : incomingCost
-
-        this.deps.stockMovementRepo.applyMovementAtomically({
-          productId: product.id,
-          movementType: 'IN_PURCHASE',
-          qtyBefore,
-          qtyChange,
-          qtyAfter,
-          unitCostSnapshot: incomingCost,
-          newProductCostPrice: weightedAvgCost,
-          referenceType: 'MANUAL',
-          referenceId: purchaseId,
-          note: `Faktur Pembelian: ${input.invoiceNumber} (${supplier.name})`,
+        this.deps.inventoryService.recordPurchaseStockInTx({
+          product,
+          qty: item.qty,
+          unitCost: item.unitCost,
+          purchaseId,
+          invoiceNumber: `${input.invoiceNumber} (${supplier.name})`,
+          expiryDate: item.expiryDate ?? null,
           actorUserId: actor.id,
           nowIso,
-          includeUnitCostInResult: true,
         })
       }
 
@@ -154,6 +141,13 @@ export class PurchaseService implements PurchaseServiceContract {
 
   public listPurchases(query: PurchasesQueryInput): PaginatedResult<PurchaseSummaryDTO> {
     return this.deps.purchaseRepo.listPaginated(query)
+  }
+
+  public getReplenishmentRecommendations(supplierId?: number) {
+    return this.deps.replenishmentRepo.getRecommendations({
+      supplierId,
+      now: new Date(),
+    })
   }
 
   public getPurchaseDetail(id: number): PurchaseDetailDTO {

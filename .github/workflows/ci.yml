@@ -6,11 +6,13 @@ on:
       - master
       - dev-fizryan
       - dev-fathir
+      - haidar
   pull_request:
     branches:
       - master
       - dev-fizryan
       - dev-fathir
+      - haidar
   workflow_dispatch:
 
 concurrency:

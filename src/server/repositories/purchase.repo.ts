@@ -41,6 +41,7 @@ interface RawPurchaseItemRow {
   qty: number
   unit_cost: number
   line_subtotal: number
+  expiry_date: string | null
 }
 
 function mapSummaryRow(row: RawPurchaseSummaryRow): PurchaseSummaryDTO {
@@ -72,6 +73,7 @@ function mapItemRow(row: RawPurchaseItemRow): PurchaseItemDTO {
     qty: row.qty,
     unitCost: row.unit_cost,
     lineSubtotal: row.line_subtotal,
+    expiryDate: row.expiry_date,
   }
 }
 
@@ -110,9 +112,10 @@ export class PurchaseRepository {
         unit_snapshot,
         qty,
         unit_cost,
-        line_subtotal
+        line_subtotal,
+        expiry_date
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     this.stmtFindHeaderById = db.prepare(`
@@ -155,7 +158,8 @@ export class PurchaseRepository {
         unit_snapshot,
         qty,
         unit_cost,
-        line_subtotal
+        line_subtotal,
+        expiry_date
       FROM purchase_items
       WHERE purchase_id = ?
       ORDER BY id ASC
@@ -216,6 +220,7 @@ export class PurchaseRepository {
       qty: number
       unitCost: number
       lineSubtotal: number
+      expiryDate: string | null
     }>
   }): number {
     let purchaseId: number
@@ -251,6 +256,7 @@ export class PurchaseRepository {
         item.qty,
         item.unitCost,
         item.lineSubtotal,
+        item.expiryDate,
       )
     }
 
