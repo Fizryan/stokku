@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Fizryan/stokku/actions/workflows/ci.yml/badge.svg)](https://github.com/Fizryan/stokku/actions/workflows/ci.yml)
 [![Release](https://github.com/Fizryan/stokku/actions/workflows/release.yml/badge.svg)](https://github.com/Fizryan/stokku/actions/workflows/release.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Fizryan_stokku&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Fizryan_stokku)
 
 Aplikasi web _fullstack_ terintegrasi untuk manajemen inventaris, buku besar stok (_immutable ledger_), kasir (_Point of Sale_), manajemen shift kasir, pengadaan supplier, loyalitas pelanggan, audit trail, dan pemulihan bencana (_disaster recovery_). Dibangun di atas fondasi teknologi **Node.js LTS (`node:sqlite` mode WAL)**, **Hono**, **Zod v4**, **Vite 8**, dan **Tailwind CSS v4** dengan filosofi antarmuka **Material 3 Calm Sapphire Blue**.
 
@@ -150,7 +151,10 @@ docker compose ps
 Setiap rilis versi dan commit pada branch `master` otomatis dipublikasikan ke **GHCR** sebagai image multi-arsitektur (`linux/amd64` & `linux/arm64`):
 
 ```bash
-# Tarik image produksi terbaru dari GHCR
+# Tarik image produksi menggunakan tag rilis spesifik (rekomendasi untuk stabilitas)
+docker pull ghcr.io/fizryan/stokku:v1.0.0
+
+# Atau gunakan tag latest untuk lingkungan demonstrasi/uji coba
 docker pull ghcr.io/fizryan/stokku:latest
 
 # Jalankan container dengan persistent volume SQLite
@@ -158,8 +162,12 @@ docker run -d \
   --name stokku-app \
   -p 3000:3000 \
   -v stokku_sqlite_data:/data \
-  ghcr.io/fizryan/stokku:latest
+  ghcr.io/fizryan/stokku:v1.0.0
 ```
+
+> [!IMPORTANT]
+> **Praktik Terbaik Produksi (Stabilitas Deployment):**
+> Untuk server produksi, hindari menggunakan tag mengambang seperti `:latest`. Selalu pin versi image ke tag rilis terverifikasi (misal: `ghcr.io/fizryan/stokku:v1.0.0`) atau OCI image digest (`ghcr.io/fizryan/stokku@sha256:...`) agar terhindar dari pembaruan otomatis yang tidak terencana.
 
 Aplikasi aktif pada port `http://localhost:3000`. Database dan berkas cadangan disimpan secara persisten di Docker volume `stokku_sqlite_data` pada path container `/data`.
 

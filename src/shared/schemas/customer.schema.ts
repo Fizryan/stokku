@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   optionalQueryText,
   paginationQueryFields,
+  trimmedNullableEmail,
   trimmedNullableString,
   trimmedRequiredString,
 } from './common.schema.js'
@@ -12,35 +13,21 @@ export const phoneSchema = z
   .min(8, 'Nomor telepon minimal 8 karakter.')
   .max(20, 'Nomor telepon maksimal 20 karakter.')
   .regex(
-    /^(\+?[0-9]{8,20})$/,
+    /^(\+?\d{8,20})$/,
     'Nomor telepon hanya boleh memuat angka dan tanda plus (+) di awal.',
   )
 
 export const createCustomerSchema = z.object({
   phone: phoneSchema,
   name: trimmedRequiredString('Nama pelanggan', 2, 80),
-  email: z
-    .string()
-    .trim()
-    .email('Format alamat email tidak valid.')
-    .max(120, 'Maksimal 120 karakter.')
-    .nullable()
-    .optional()
-    .transform((val) => (val && val.length > 0 ? val : null)),
+  email: trimmedNullableEmail(120),
   address: trimmedNullableString(255),
   notes: trimmedNullableString(255),
 })
 
 export const updateCustomerSchema = z.object({
   name: trimmedRequiredString('Nama pelanggan', 2, 80),
-  email: z
-    .string()
-    .trim()
-    .email('Format alamat email tidak valid.')
-    .max(120, 'Maksimal 120 karakter.')
-    .nullable()
-    .optional()
-    .transform((val) => (val && val.length > 0 ? val : null)),
+  email: trimmedNullableEmail(120),
   address: trimmedNullableString(255),
   notes: trimmedNullableString(255),
   isActive: z.boolean({ error: 'Status aktif harus berupa boolean.' }),

@@ -16,6 +16,28 @@ export interface CloseShiftModalProps {
   readonly onShiftClosed: (closedShift: CashShiftDetailDTO) => void
 }
 
+function CashDifferenceBadge({ difference }: { readonly difference: number }) {
+  if (difference === 0) {
+    return (
+      <Badge tone="success" class="font-bold">
+        ✓ Seimbang (Pas: {formatRupiah(0)})
+      </Badge>
+    )
+  }
+  if (difference > 0) {
+    return (
+      <Badge tone="primary" class="font-bold">
+        + Lebih {formatRupiah(difference)} (Surplus)
+      </Badge>
+    )
+  }
+  return (
+    <Badge tone="danger" class="font-bold">
+      - Kurang {formatRupiah(Math.abs(difference))} (Defisit)
+    </Badge>
+  )
+}
+
 export function CloseShiftModal(props: CloseShiftModalProps) {
   const { showToast } = useToast()
   const expectedCash = props.shift?.expectedCash ?? 0
@@ -142,19 +164,7 @@ export function CloseShiftModal(props: CloseShiftModalProps) {
 
           <div class="p-3 rounded-xl border flex items-center justify-between gap-3 text-xs">
             <span class="font-medium text-m3-on-surface">Status Rekonsiliasi:</span>
-            {cashDifference === 0 ? (
-              <Badge tone="success" class="font-bold">
-                ✓ Seimbang (Pas: {formatRupiah(0)})
-              </Badge>
-            ) : cashDifference > 0 ? (
-              <Badge tone="primary" class="font-bold">
-                + Lebih {formatRupiah(cashDifference)} (Surplus)
-              </Badge>
-            ) : (
-              <Badge tone="danger" class="font-bold">
-                - Kurang {formatRupiah(Math.abs(cashDifference))} (Defisit)
-              </Badge>
-            )}
+            <CashDifferenceBadge difference={cashDifference} />
           </div>
         </div>
 

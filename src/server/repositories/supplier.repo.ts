@@ -173,7 +173,7 @@ export class SupplierRepository {
     if (query.search) {
       const escaped = `%${escapeSqlLikePattern(query.search)}%`
       conditions.push(
-        "(name LIKE ? ESCAPE '\\' OR COALESCE(contact_person, '') LIKE ? ESCAPE '\\' OR COALESCE(phone, '') LIKE ? ESCAPE '\\')",
+        String.raw`(name LIKE ? ESCAPE '\' OR COALESCE(contact_person, '') LIKE ? ESCAPE '\' OR COALESCE(phone, '') LIKE ? ESCAPE '\')`,
       )
       params.push(escaped, escaped, escaped)
     }

@@ -24,6 +24,22 @@ import { ShiftZReportModal } from '../shifts/ShiftZReportModal.js'
 import { CheckoutModal } from './CheckoutModal.js'
 import { PosCartPanel } from './PosCartPanel.js'
 
+function getProductCardToneClass(disabled: boolean, inCart: number): string {
+  if (disabled) {
+    return 'bg-m3-surface-container/60 border-m3-outline-variant/40 opacity-55 cursor-not-allowed'
+  }
+  if (inCart > 0) {
+    return 'bg-m3-primary-container/35 border-m3-primary shadow-xs cursor-pointer'
+  }
+  return 'bg-m3-surface-container-lowest border-m3-outline-variant/70 hover:border-m3-primary/60 hover:bg-m3-surface-container-low/50 cursor-pointer'
+}
+
+function getRemainingStockToneClass(remaining: number, isLowStock: boolean): string {
+  if (remaining <= 0) return 'text-m3-danger font-medium'
+  if (isLowStock) return 'text-m3-warning'
+  return 'text-m3-on-surface-variant'
+}
+
 export function PosPage() {
   const {
     lines,
@@ -216,7 +232,7 @@ export function PosPage() {
             )}
           </Card>
 
-          {loading && products.length === 0 ? (
+          {loading && products.length === 0 && (
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[1, 2, 3, 4, 5, 6].map((n) => (
                 <div
@@ -225,7 +241,9 @@ export function PosPage() {
                 />
               ))}
             </div>
-          ) : products.length === 0 ? (
+          )}
+
+          {!loading && products.length === 0 && (
             <Card>
               <EmptyState
                 icon={<IconCatalog />}
@@ -233,7 +251,9 @@ export function PosPage() {
                 description="Coba kata kunci lain atau pastikan produk sudah diaktifkan pada menu Katalog."
               />
             </Card>
-          ) : (
+          )}
+
+          {products.length > 0 && (
             <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
               {products.map((prod) => {
                 const inCart = cartQtyMap.get(prod.id) ?? 0
@@ -248,11 +268,7 @@ export function PosPage() {
                     onClick={() => handleAddTile(prod)}
                     class={[
                       'group text-left rounded-2xl p-3.5 border transition-all duration-150 flex flex-col justify-between gap-3 select-none',
-                      disabled
-                        ? 'bg-m3-surface-container/60 border-m3-outline-variant/40 opacity-55 cursor-not-allowed'
-                        : inCart > 0
-                          ? 'bg-m3-primary-container/35 border-m3-primary shadow-xs cursor-pointer'
-                          : 'bg-m3-surface-container-lowest border-m3-outline-variant/70 hover:border-m3-primary/60 hover:bg-m3-surface-container-low/50 cursor-pointer',
+                      getProductCardToneClass(disabled, inCart),
                     ].join(' ')}
                   >
                     <div class="flex flex-col gap-1 min-w-0 w-full">
@@ -279,11 +295,7 @@ export function PosPage() {
                         <p
                           class={[
                             'text-[11px] tabular-nums',
-                            remaining <= 0
-                              ? 'text-m3-danger font-medium'
-                              : prod.isLowStock
-                                ? 'text-m3-warning'
-                                : 'text-m3-on-surface-variant',
+                            getRemainingStockToneClass(remaining, prod.isLowStock),
                           ].join(' ')}
                         >
                           {prod.stockQty === 0

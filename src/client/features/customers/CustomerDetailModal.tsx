@@ -22,6 +22,76 @@ export interface CustomerDetailModalProps {
   readonly onCustomerUpdated?: (updated: CustomerDTO) => void
 }
 
+function PointMutationsContent({
+  loading,
+  mutations,
+}: {
+  readonly loading: boolean
+  readonly mutations: readonly CustomerPointMutationDTO[]
+}) {
+  if (loading) {
+    return (
+      <div class="p-6 text-center text-xs text-m3-on-surface-variant">
+        Memuat riwayat mutasi poin...
+      </div>
+    )
+  }
+
+  if (mutations.length === 0) {
+    return (
+      <div class="p-6 text-center text-xs text-m3-on-surface-variant">
+        Belum ada aktivitas mutasi poin untuk pelanggan ini.
+      </div>
+    )
+  }
+
+  return (
+    <table class="w-full text-left text-xs">
+      <thead class="bg-m3-surface-container text-m3-on-surface-variant font-semibold">
+        <tr>
+          <th class="py-2.5 px-3">Waktu</th>
+          <th class="py-2.5 px-3">Jenis Mutasi</th>
+          <th class="py-2.5 px-3 text-right">Poin</th>
+          <th class="py-2.5 px-3">Keterangan</th>
+          <th class="py-2.5 px-3">Operator</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-m3-outline-variant">
+        {mutations.map((m) => {
+          const isPositive = m.points > 0
+          return (
+            <tr key={m.id} class="hover:bg-m3-surface-container-low/50">
+              <td class="py-2 px-3 text-m3-on-surface whitespace-nowrap">
+                {formatDateTime(m.createdAt)}
+              </td>
+              <td class="py-2 px-3">
+                <Badge tone={isPositive ? 'success' : 'warning'}>
+                  {POINT_MUTATION_TYPE_LABELS[m.mutationType]}
+                </Badge>
+              </td>
+              <td class="py-2 px-3 text-right font-bold whitespace-nowrap">
+                <span
+                  class={
+                    isPositive
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }
+                >
+                  {isPositive ? `+${formatInteger(m.points)}` : formatInteger(m.points)}
+                </span>
+              </td>
+              <td class="py-2 px-3 text-m3-on-surface">{m.description}</td>
+              <td class="py-2 px-3 text-m3-on-surface-variant whitespace-nowrap">
+                {m.actorName}
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
 export function CustomerDetailModal(props: CustomerDetailModalProps) {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -80,10 +150,8 @@ export function CustomerDetailModal(props: CustomerDetailModalProps) {
         points: pointsNum,
         description: adjustDescription.trim(),
       })
-      showToast(
-        `Saldo poin berhasil disesuaikan (${pointsNum > 0 ? `+${pointsNum}` : pointsNum} poin).`,
-        'success',
-      )
+      const deltaPrefix = pointsNum > 0 ? `+${pointsNum}` : String(pointsNum)
+      showToast(`Saldo poin berhasil disesuaikan (${deltaPrefix} poin).`, 'success')
       setShowAdjustForm(false)
       setAdjustPointsValue('')
       setAdjustDescription('')

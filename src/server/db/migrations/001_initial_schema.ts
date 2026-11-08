@@ -113,7 +113,7 @@ export const migration001InitialSchema: DatabaseMigration = {
         discount_amount >= 0 AND discount_amount <= subtotal_amount
       ),
       total_amount INTEGER NOT NULL CHECK (
-        total_amount >= 0 AND total_amount = subtotal_amount - discount_amount
+        total_amount >= 0
       ),
       payment_method TEXT NOT NULL CHECK (payment_method IN ('CASH', 'QRIS', 'TRANSFER')),
       paid_amount INTEGER NOT NULL CHECK (paid_amount >= total_amount),

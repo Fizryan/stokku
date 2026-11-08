@@ -18,11 +18,12 @@ export function Pagination(props: PaginationProps) {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-m3-outline-variant/50 text-xs text-m3-on-surface-variant">
       <p class="tabular-nums">
         Menampilkan{' '}
-        <span class="font-semibold text-m3-on-surface">{formatInteger(startItem)}</span>–
-        <span class="font-semibold text-m3-on-surface">{formatInteger(endItem)}</span>{' '}
-        dari{' '}
-        <span class="font-semibold text-m3-on-surface">{formatInteger(totalItems)}</span>{' '}
-        data
+        <span class="font-semibold text-m3-on-surface">{formatInteger(startItem)}</span>
+        {' – '}
+        <span class="font-semibold text-m3-on-surface">{formatInteger(endItem)}</span>
+        {' dari '}
+        <span class="font-semibold text-m3-on-surface">{formatInteger(totalItems)}</span>
+        {' data'}
       </p>
 
       <div class="flex items-center gap-2 self-end sm:self-auto">

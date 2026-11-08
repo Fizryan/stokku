@@ -347,7 +347,7 @@ export class PurchaseRepository {
     if (query.search) {
       const escaped = `%${escapeSqlLikePattern(query.search)}%`
       conditions.push(
-        "(p.invoice_number LIKE ? ESCAPE '\\' OR s.name LIKE ? ESCAPE '\\')",
+        String.raw`(p.invoice_number LIKE ? ESCAPE '\' OR s.name LIKE ? ESCAPE '\')`,
       )
       params.push(escaped, escaped)
     }

@@ -10,6 +10,28 @@ export interface ShiftZReportModalProps {
   readonly onClose: () => void
 }
 
+function ZReportDifferenceBadge({ difference }: { readonly difference: number }) {
+  if (difference === 0) {
+    return (
+      <Badge tone="success" class="tabular-nums">
+        ✓ PAS (Rp 0)
+      </Badge>
+    )
+  }
+  if (difference > 0) {
+    return (
+      <Badge tone="primary" class="tabular-nums">
+        + Lebih {formatRupiah(difference)}
+      </Badge>
+    )
+  }
+  return (
+    <Badge tone="danger" class="tabular-nums">
+      - Kurang {formatRupiah(Math.abs(difference))}
+    </Badge>
+  )
+}
+
 export function ShiftZReportModal(props: ShiftZReportModalProps) {
   if (!props.shift) return null
   const shift = props.shift
@@ -117,19 +139,7 @@ export function ShiftZReportModal(props: ShiftZReportModalProps) {
 
             <div class="flex justify-between items-center pt-1.5 border-t border-dashed border-m3-outline-variant">
               <span>Selisih Rekonsiliasi:</span>
-              {difference === 0 ? (
-                <Badge tone="success" class="tabular-nums">
-                  ✓ PAS (Rp 0)
-                </Badge>
-              ) : difference > 0 ? (
-                <Badge tone="primary" class="tabular-nums">
-                  + Lebih {formatRupiah(difference)}
-                </Badge>
-              ) : (
-                <Badge tone="danger" class="tabular-nums">
-                  - Kurang {formatRupiah(Math.abs(difference))}
-                </Badge>
-              )}
+              <ZReportDifferenceBadge difference={difference} />
             </div>
           </div>
 
