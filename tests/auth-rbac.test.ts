@@ -171,7 +171,7 @@ describe('Authentication, Session Revocation & RBAC Matrix', () => {
         items: [{ productId: prodCreate.body.data.id, qty: 1 }],
         discountAmount: 0,
         paymentMethod: 'QRIS',
-        paidAmount: 72_000,
+        paidAmount: 79_920,
         customerName: null,
       },
     })

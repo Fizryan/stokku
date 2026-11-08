@@ -183,7 +183,7 @@ describe('Shifts Management & POS Edge-Cases (Extended Flow)', () => {
       method: 'POST',
       json: {
         paymentMethod: 'CASH',
-        paidAmount: 15000, // total tagihan 20,000
+        paidAmount: 15000, // total tagihan 22.200 (20.000 + pajak 11%)
         items: [{ productId: prod1Id, qty: 2 }],
       },
     })
@@ -194,18 +194,18 @@ describe('Shifts Management & POS Edge-Cases (Extended Flow)', () => {
       method: 'POST',
       json: {
         paymentMethod: 'QRIS',
-        paidAmount: 25000, // total is 20,000
+        paidAmount: 25000, // total is 22.200 (20.000 + pajak 11%)
         items: [{ productId: prod1Id, qty: 2 }],
       },
     })
     assert.equal(chkQrisMismatch.status, 422)
 
-    // g. Successful QRIS checkout
+    // g. Successful QRIS checkout (subtotal 20.000 + pajak 11% = 22.200)
     const chkQrisSuccess = await client.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',
       json: {
         paymentMethod: 'QRIS',
-        paidAmount: 20000,
+        paidAmount: 22_200,
         items: [{ productId: prod1Id, qty: 2 }],
         notes: 'Pembayaran QRIS Statis',
       },
@@ -213,6 +213,8 @@ describe('Shifts Management & POS Edge-Cases (Extended Flow)', () => {
     assert.equal(chkQrisSuccess.status, 201)
     assert(chkQrisSuccess.body.ok)
     assert.equal(chkQrisSuccess.body.data.paymentMethod, 'QRIS')
+    assert.equal(chkQrisSuccess.body.data.taxAmount, 2_200)
+    assert.equal(chkQrisSuccess.body.data.totalAmount, 22_200)
     const saleId = chkQrisSuccess.body.data.id
 
     // 6. Sale queries & details
@@ -276,5 +278,159 @@ describe('Shifts Management & POS Edge-Cases (Extended Flow)', () => {
       json: { actualCash: 100000 },
     })
     assert.equal(closeAgain.status, 400)
+  })
+
+  it('close shift reconciles cash against tax-inclusive sale totals (expectedCash, cash/non-cash breakdown)', async () => {
+    harness = createTestHarness()
+    const owner = harness.createClient()
+
+    // 1. Initial setup: Owner
+    const setupRes = await owner.requestJson<{ user: UserDTO }>('/api/auth/setup', {
+      method: 'POST',
+      json: {
+        fullName: 'Owner Toko',
+        username: 'owner',
+        password: 'password123',
+      },
+    })
+    assert.equal(setupRes.status, 201)
+    assert(setupRes.body.ok)
+
+    // 2. Product: sell 10.000 -> every unit adds 1.100 tax to the bill
+    const prodRes = await owner.requestJson<ProductDTO>('/api/products', {
+      method: 'POST',
+      json: {
+        sku: 'TAX-SHIFT-01',
+        name: 'Produk Uji Pajak Shift',
+        unit: 'pcs',
+        costPrice: 5_000,
+        sellPrice: 10_000,
+        minStockQty: 0,
+        initialStock: 10,
+      },
+    })
+    assert.equal(prodRes.status, 201)
+    assert(prodRes.body.ok)
+    const productId = prodRes.body.data.id
+
+    // 3. Open shift with 100.000 opening cash
+    const openShiftRes = await owner.requestJson<CashShiftDetailDTO>('/api/shifts/open', {
+      method: 'POST',
+      json: { openingCash: 100_000 },
+    })
+    assert.equal(openShiftRes.status, 201)
+    assert(openShiftRes.body.ok)
+    const shiftId = openShiftRes.body.data.id
+
+    // 4. CASH sale: 10.000 + pajak 1.100 = 11.100 (overpay -> kembalian 8.900)
+    const cashSaleRes = await owner.requestJson<SaleDetailDTO>('/api/sales', {
+      method: 'POST',
+      json: {
+        items: [{ productId, qty: 1 }],
+        paymentMethod: 'CASH',
+        paidAmount: 20_000,
+      },
+    })
+    assert.equal(cashSaleRes.status, 201)
+    assert(cashSaleRes.body.ok)
+    assert.equal(cashSaleRes.body.data.taxAmount, 1_100)
+    assert.equal(cashSaleRes.body.data.totalAmount, 11_100)
+    assert.equal(cashSaleRes.body.data.changeAmount, 8_900)
+
+    // 5. QRIS sale: 20.000 + pajak 2.200 = 22.200 (exact pay)
+    const qrisSaleRes = await owner.requestJson<SaleDetailDTO>('/api/sales', {
+      method: 'POST',
+      json: {
+        items: [{ productId, qty: 2 }],
+        paymentMethod: 'QRIS',
+        paidAmount: 22_200,
+      },
+    })
+    assert.equal(qrisSaleRes.status, 201)
+    assert(qrisSaleRes.body.ok)
+    assert.equal(qrisSaleRes.body.data.taxAmount, 2_200)
+    assert.equal(qrisSaleRes.body.data.totalAmount, 22_200)
+
+    // 6. Shift totals reflect TAX-INCLUSIVE totals
+    const shiftBeforeClose = await owner.requestJson<CashShiftDetailDTO>(
+      `/api/shifts/${shiftId}`,
+    )
+    assert.equal(shiftBeforeClose.status, 200)
+    assert(shiftBeforeClose.body.ok)
+    assert.equal(shiftBeforeClose.body.data.totalCashSales, 11_100)
+    assert.equal(shiftBeforeClose.body.data.totalNonCashSales, 22_200)
+    assert.equal(shiftBeforeClose.body.data.transactionCount, 2)
+    // expectedCash = 100.000 opening + 11.100 tax-inclusive cash sales
+    assert.equal(shiftBeforeClose.body.data.expectedCash, 111_100)
+
+    // 7. Close shift with exact cash -> cashDifference 0
+    const closeShiftRes = await owner.requestJson<CashShiftDetailDTO>(
+      '/api/shifts/close',
+      {
+        method: 'POST',
+        json: {
+          actualCash: 111_100,
+          notes: 'Kas laci pas sesuai harapan',
+        },
+      },
+    )
+    assert.equal(closeShiftRes.status, 200)
+    assert(closeShiftRes.body.ok)
+    assert.equal(closeShiftRes.body.data.status, 'CLOSED')
+    assert.equal(closeShiftRes.body.data.expectedCash, 111_100)
+    assert.equal(closeShiftRes.body.data.closingCash, 111_100)
+    assert.equal(closeShiftRes.body.data.cashDifference, 0)
+    assert.equal(closeShiftRes.body.data.totalCashSales, 11_100)
+    assert.equal(closeShiftRes.body.data.totalNonCashSales, 22_200)
+
+    // 8. Voided tax-inclusive sale must NOT inflate shift cash expectations
+    //    (open a fresh shift, sell, void, then verify totals drop back)
+    const shift2Res = await owner.requestJson<CashShiftDetailDTO>('/api/shifts/open', {
+      method: 'POST',
+      json: { openingCash: 50_000 },
+    })
+    assert.equal(shift2Res.status, 201)
+    assert(shift2Res.body.ok)
+    const shift2Id = shift2Res.body.data.id
+
+    const sale2Res = await owner.requestJson<SaleDetailDTO>('/api/sales', {
+      method: 'POST',
+      json: {
+        items: [{ productId, qty: 1 }],
+        paymentMethod: 'CASH',
+        paidAmount: 11_100,
+      },
+    })
+    assert.equal(sale2Res.status, 201)
+    assert(sale2Res.body.ok)
+    const sale2 = sale2Res.body.data
+
+    const voidRes = await owner.requestJson<SaleDetailDTO>(
+      `/api/sales/${sale2.id}/void`,
+      {
+        method: 'POST',
+        json: { reason: 'Batal, uji pajak tidak masuk kas shift' },
+      },
+    )
+    assert.equal(voidRes.status, 200)
+
+    const shift2AfterVoid = await owner.requestJson<CashShiftDetailDTO>(
+      `/api/shifts/${shift2Id}`,
+    )
+    assert(shift2AfterVoid.body.ok)
+    assert.equal(shift2AfterVoid.body.data.totalCashSales, 0)
+    assert.equal(shift2AfterVoid.body.data.totalNonCashSales, 0)
+    assert.equal(shift2AfterVoid.body.data.expectedCash, 50_000)
+
+    const closeShift2Res = await owner.requestJson<CashShiftDetailDTO>(
+      '/api/shifts/close',
+      {
+        method: 'POST',
+        json: { actualCash: 50_000 },
+      },
+    )
+    assert.equal(closeShift2Res.status, 200)
+    assert(closeShift2Res.body.ok)
+    assert.equal(closeShift2Res.body.data.cashDifference, 0)
   })
 })

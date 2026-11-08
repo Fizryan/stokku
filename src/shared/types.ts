@@ -134,6 +134,7 @@ export interface SaleSummaryDTO {
   readonly totalQty: number
   readonly subtotalAmount: number
   readonly discountAmount: number
+  readonly taxAmount: number
   readonly totalAmount: number
   readonly grossProfitAmount: number | null
   readonly paymentMethod: PaymentMethod
@@ -219,6 +220,20 @@ export interface CashShiftDetailDTO extends CashShiftSummaryDTO {
 export interface CurrentShiftStatusDTO {
   readonly hasActiveShift: boolean
   readonly shift: CashShiftDetailDTO | null
+}
+
+export interface ReplenishmentRecommendationDTO {
+  readonly productId: number
+  readonly sku: string
+  readonly productName: string
+  readonly unit: string
+  readonly stockQty: number
+  readonly minStockQty: number
+  readonly avgDailySales: number
+  readonly recommendedQty: number
+  readonly leadTimeDays: number
+  readonly supplierId: number | null
+  readonly supplierName: string | null
 }
 
 export interface SupplierDTO {

@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from 'hono/jsx/dom'
-import { LOYALTY_RULES, type PaymentMethod } from '../../shared/constants.js'
+import { LOYALTY_RULES, type PaymentMethod, TAX_RATE } from '../../shared/constants.js'
 import type { CustomerDTO, ProductDTO } from '../../shared/types.js'
 
 export interface PosCartLine {
@@ -115,6 +115,7 @@ interface PosCartContextValue {
   readonly totalItemsCount: number
   readonly subtotalAmount: number
   readonly effectiveDiscountAmount: number
+  readonly taxAmount: number
   readonly grandTotalAmount: number
   readonly addProduct: (product: ProductDTO, addQty?: number) => AddProductResult
   readonly updateLineQty: (productId: number, nextQty: number) => AddProductResult
@@ -325,6 +326,7 @@ export function PosCartProvider(props: { children: Child }) {
     subtotalAmount,
     pointsDiscountAmount,
     effectiveDiscountAmount,
+    taxAmount,
     grandTotalAmount,
   } = useMemo(() => {
     let count = 0
@@ -335,12 +337,14 @@ export function PosCartProvider(props: { children: Child }) {
     }
     const ptsDisc = pointsRedeemed * LOYALTY_RULES.POINT_VALUE_IN_RUPIAH
     const effDisc = Math.min(discountAmount + ptsDisc, sub)
+    const tax = Math.round((sub - effDisc) * TAX_RATE)
     return {
       totalItemsCount: count,
       subtotalAmount: sub,
       pointsDiscountAmount: ptsDisc,
       effectiveDiscountAmount: effDisc,
-      grandTotalAmount: sub - effDisc,
+      taxAmount: tax,
+      grandTotalAmount: sub - effDisc + tax,
     }
   }, [lines, discountAmount, pointsRedeemed])
 
@@ -356,6 +360,7 @@ export function PosCartProvider(props: { children: Child }) {
       totalItemsCount,
       subtotalAmount,
       effectiveDiscountAmount,
+      taxAmount,
       grandTotalAmount,
       addProduct,
       updateLineQty,
@@ -379,6 +384,7 @@ export function PosCartProvider(props: { children: Child }) {
       totalItemsCount,
       subtotalAmount,
       effectiveDiscountAmount,
+      taxAmount,
       grandTotalAmount,
       addProduct,
       updateLineQty,
