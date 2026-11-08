@@ -245,7 +245,6 @@ export interface SupplierDTO {
   readonly notes: string | null
   readonly leadTimeDays: number
   readonly isActive: boolean
-  readonly leadTimeDays: number
   readonly createdAt: string
 }
 

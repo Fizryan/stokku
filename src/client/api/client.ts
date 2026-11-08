@@ -47,7 +47,6 @@ import type {
   PaymentMethod,
   ProductDTO,
   PurchaseDetailDTO,
-  ReplenishmentRecommendationDTO,
   PurchasePaymentStatus,
   PurchaseSummaryDTO,
   ReplenishmentRecommendationDTO,
@@ -516,17 +515,6 @@ export const api = {
   },
 
   purchases: {
-    recommendations(
-      supplierId?: number,
-    ): Promise<readonly ReplenishmentRecommendationDTO[]> {
-      return unwrapApiResponse<readonly ReplenishmentRecommendationDTO[]>(
-        rpcClient.api.purchases.recommendations.$get({
-          query: {
-            supplierId: supplierId !== undefined ? String(supplierId) : undefined,
-          },
-        }),
-      )
-    },
     create(input: CreatePurchaseInput): Promise<PurchaseDetailDTO> {
       return unwrapApiResponse<PurchaseDetailDTO>(
         rpcClient.api.purchases.$post({ json: input }),
@@ -582,10 +570,11 @@ export const api = {
         }),
       )
     },
-    recommendations(supplierId: number, signal?: AbortSignal): Promise<readonly ReplenishmentRecommendationDTO[]> {
+    recommendations(
+      _supplierId: number,
+      _signal?: AbortSignal,
+    ): Promise<readonly ReplenishmentRecommendationDTO[]> {
       throw new Error('Not implemented')
-      void supplierId
-      void signal
     },
   },
 

@@ -29,7 +29,6 @@ export type {
   PaginatedResult,
   PaginationMeta,
   ProductDTO,
-  ReplenishmentRecommendationDTO,
   PurchaseDetailDTO,
   PurchaseItemDTO,
   PurchaseSummaryDTO,
