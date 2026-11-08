@@ -28,6 +28,12 @@ export function createPurchasesRoutes(services: AppServices) {
       const result = services.purchases.listPurchases(query)
       return c.json({ ok: true as const, data: result }, 200)
     })
+    .get('/payables-summary', canView, (c) => {
+      const summary = services.purchases.getPayablesSummary(
+        new Date().toISOString().slice(0, 10),
+      )
+      return c.json({ ok: true as const, data: summary }, 200)
+    })
     .post('/', canManage, validateJson(createPurchaseSchema), (c) => {
       const actor = c.get('currentUser')
       const input = c.req.valid('json')

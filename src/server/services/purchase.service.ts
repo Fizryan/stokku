@@ -7,6 +7,7 @@ import type {
 import type {
   PaginatedResult,
   PurchaseDetailDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   UserDTO,
 } from '../../shared/types.js'
@@ -154,6 +155,10 @@ export class PurchaseService implements PurchaseServiceContract {
 
   public listPurchases(query: PurchasesQueryInput): PaginatedResult<PurchaseSummaryDTO> {
     return this.deps.purchaseRepo.listPaginated(query)
+  }
+
+  public getPayablesSummary(today: string): PurchasePayablesSummaryDTO {
+    return this.deps.purchaseRepo.getPayablesSummary(today)
   }
 
   public getPurchaseDetail(id: number): PurchaseDetailDTO {

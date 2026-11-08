@@ -265,6 +265,15 @@ export interface PurchaseDetailDTO extends PurchaseSummaryDTO {
   readonly items: readonly PurchaseItemDTO[]
 }
 
+export interface PurchasePayablesSummaryDTO {
+  readonly unpaidCount: number
+  readonly unpaidAmount: number
+  readonly overdueCount: number
+  readonly overdueAmount: number
+  readonly dueTodayCount: number
+  readonly dueTodayAmount: number
+}
+
 export interface CustomerDTO {
   readonly id: number
   readonly phone: string

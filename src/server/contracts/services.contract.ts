@@ -48,6 +48,7 @@ import type {
   PaginatedResult,
   ProductDTO,
   PurchaseDetailDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   SaleDetailDTO,
   SaleSummaryDTO,
@@ -151,6 +152,7 @@ export interface SupplierServiceContract {
 export interface PurchaseServiceContract {
   createPurchase(actor: UserDTO, input: CreatePurchaseInput): PurchaseDetailDTO
   listPurchases(query: PurchasesQueryInput): PaginatedResult<PurchaseSummaryDTO>
+  getPayablesSummary(today: string): PurchasePayablesSummaryDTO
   getPurchaseDetail(id: number): PurchaseDetailDTO
   updatePaymentStatus(
     id: number,

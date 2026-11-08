@@ -59,6 +59,7 @@ export const updatePurchasePaymentStatusSchema = z.object({
 export const purchasesQuerySchema = z.object({
   supplierId: optionalPositiveIntQuery,
   paymentStatus: optionalEnumQueryParam(PURCHASE_PAYMENT_STATUSES),
+  dueStatus: optionalEnumQueryParam(['OVERDUE', 'DUE_TODAY']),
   search: optionalQueryText,
   dateFrom: optionalIsoDateQuery,
   dateTo: optionalIsoDateQuery,

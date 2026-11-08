@@ -30,6 +30,7 @@ export type {
   ProductDTO,
   PurchaseDetailDTO,
   PurchaseItemDTO,
+  PurchasePayablesSummaryDTO,
   PurchaseSummaryDTO,
   SaleDetailDTO,
   SaleItemDTO,
