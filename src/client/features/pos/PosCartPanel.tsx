@@ -37,6 +37,7 @@ export function PosCartPanel(props: PosCartPanelProps) {
     pointsDiscountAmount,
     totalItemsCount,
     subtotalAmount,
+    taxAmount,
     grandTotalAmount,
     updateLineQty,
     removeLine,
@@ -338,6 +339,10 @@ export function PosCartPanel(props: PosCartPanelProps) {
                   <span>-{formatRupiah(discountAmount)}</span>
                 </div>
               )}
+              <div class="flex justify-between text-m3-on-surface-variant">
+                <span>Pajak (11%)</span>
+                <span>{formatRupiah(taxAmount)}</span>
+              </div>
               <div class="flex justify-between text-base font-bold text-m3-on-surface pt-1.5 border-t border-m3-outline-variant/50">
                 <span>Total Tagihan</span>
                 <span class="text-m3-primary">{formatRupiah(grandTotalAmount)}</span>

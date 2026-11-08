@@ -134,6 +134,7 @@ export interface SaleSummaryDTO {
   readonly totalQty: number
   readonly subtotalAmount: number
   readonly discountAmount: number
+  readonly taxAmount: number
   readonly totalAmount: number
   readonly grossProfitAmount: number | null
   readonly paymentMethod: PaymentMethod

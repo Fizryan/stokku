@@ -122,6 +122,12 @@ export function ReceiptModal(props: ReceiptModalProps) {
               <span>-{formatRupiah(sale.discountAmount)}</span>
             </div>
           )}
+          {sale.taxAmount > 0 && (
+            <div class="flex justify-between">
+              <span class="text-slate-600">Pajak (11%)</span>
+              <span>{formatRupiah(sale.taxAmount)}</span>
+            </div>
+          )}
           <div class="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-slate-200">
             <span>TOTAL</span>
             <span>{formatRupiah(sale.totalAmount)}</span>
