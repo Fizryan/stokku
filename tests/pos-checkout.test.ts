@@ -198,7 +198,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
         items: [{ productId: prod1.id, qty: 5 }],
         discountAmount: 0,
         paymentMethod: 'CASH',
-        paidAmount: 60_000,
+        paidAmount: 70_000,
       },
     })
     assert.equal(expiredStockCheckout.status, 409)
@@ -362,8 +362,8 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     assert.equal(result.isRounded, false)
   })
 
-  it('TC-CR-05: checkout totalAmount and changeAmount reflect rounded total', async () => {
-    // 12.400 × 2 = 24.800 → rounds to 25.000; paid 30.000 → change 5.000
+  it('TC-CR-05: checkout totalAmount is exact (subtotal + tax), no cash rounding', async () => {
+    // 12.400 × 2 = 24.800 subtotal; tax 11% = 2.728 → total 27.528; paid 30.000 → change 2.472
     harness = createTestHarness()
     const owner = harness.createClient()
     await setupOwner(owner, 'Owner Rounding', 'owner_cr')
@@ -380,8 +380,8 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
     const saleRes = await checkout(owner, [{ productId: prod.id, qty: 2 }], 30_000)
     assert.equal(saleRes.status, 201)
     assert(saleRes.body.ok)
-    assert.equal(saleRes.body.data.totalAmount, 25_000)
-    assert.equal(saleRes.body.data.changeAmount, 5_000)
+    assert.equal(saleRes.body.data.totalAmount, 27_528)
+    assert.equal(saleRes.body.data.changeAmount, 2_472)
   })
 
   //FITUR 2: Shift-Lock Integrity Guard on Void
@@ -400,7 +400,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
       initialStock: 5,
     })
     await openShift(owner, 50_000)
-    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 10_000)
+    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 20_000)
     assert.equal(saleRes.status, 201)
     assert(saleRes.body.ok)
     const voidRes = await voidSale(owner, saleRes.body.data.id, 'void saat shift open')
@@ -423,7 +423,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
       initialStock: 5,
     })
     await openShift(owner, 50_000)
-    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 10_000)
+    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 20_000)
     assert.equal(saleRes.status, 201)
     assert(saleRes.body.ok)
     const closeRes = await owner.requestJson('/api/shifts/close', {
@@ -537,7 +537,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
       initialStock: 10,
     })
     await openShift(owner)
-    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 10_000)
+    const saleRes = await checkout(owner, [{ productId: prod.id, qty: 1 }], 20_000)
     assert.equal(saleRes.status, 201)
     assert(saleRes.body.ok)
     const sale = saleRes.body.data
@@ -649,7 +649,7 @@ describe('POS Checkout, Historical Snapshot & Void Reversal', () => {
         { productId: prod.id, qty: 2 },
         { productId: prod.id, qty: 1 },
       ],
-      30_000,
+      40_000,
     )
     assert.equal(saleRes.status, 201)
     assert(saleRes.body.ok)

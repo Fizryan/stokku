@@ -362,9 +362,9 @@ export class PosService implements PosServiceContract {
     }
 
     const taxAmount = Math.round((subtotalAmount - totalDiscount) * TAX_RATE)
-    const baseTotal = subtotalAmount - totalDiscount
-    const rounding = calculateCashRounding(baseTotal, paymentMethod)
-    const totalAmount = rounding.roundedAmount
+    // Exact totals: totalAmount must equal (subtotal - discounts) + tax exactly
+    // (migration 007 CHECK constraint). Cash rounding is NOT applied at checkout.
+    const totalAmount = subtotalAmount - totalDiscount + taxAmount
 
     if (paidAmount < totalAmount) {
       throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
