@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { hasPermission, LOYALTY_RULES } from '../../shared/constants.js'
 import type {
@@ -6,9 +7,12 @@ import type {
   VoidSaleInput,
 } from '../../shared/schemas/index.js'
 import type {
+  CashRoundingResult,
   PaginatedResult,
+  ReceiptVerificationResult,
   SaleDetailDTO,
   SaleSummaryDTO,
+  StockDeficiencyItem,
   UserDTO,
 } from '../../shared/types.js'
 import type {
@@ -22,6 +26,144 @@ import type { ProductRepository } from '../repositories/product.repo.js'
 import type { SaleRepository } from '../repositories/sale.repo.js'
 import type { ShiftRepository } from '../repositories/shift.repo.js'
 import type { InventoryService } from './inventory.service.js'
+
+// Automated Cash Rounding Engine
+export function calculateCashRounding(
+  amount: number,
+  paymentMethod: string,
+  step = 500,
+): CashRoundingResult {
+  if (paymentMethod !== 'CASH') {
+    return {
+      originalAmount: amount,
+      roundedAmount: amount,
+      roundingDifference: 0,
+      isRounded: false,
+    }
+  }
+
+  const roundedAmount = Math.round(amount / step) * step
+  const roundingDifference = roundedAmount - amount
+
+  return {
+    originalAmount: amount,
+    roundedAmount,
+    roundingDifference,
+    isRounded: roundingDifference !== 0,
+  }
+}
+
+// Shift-Lock Integrity Guard on Void
+export function assertSaleCanBeVoided(
+  sale: SaleDetailDTO,
+  shift: { id: number; status: string } | null | undefined,
+): void {
+  if (!shift) {
+    return
+  }
+
+  if (shift.status === 'CLOSED') {
+    throw AppError.badRequest(
+      `Transaksi ${sale.invoiceNumber} tidak dapat dibatalkan karena Shift #${shift.id} sudah ditutup dan pembukuan kas telah direkonsiliasi. ` +
+        'Hubungi supervisor untuk proses pengembalian melalui jalur resmi.',
+    )
+  }
+}
+
+// Cryptographic Digital Receipt Signature
+function getReceiptSignatureKey(): string {
+  return process.env.RECEIPT_SIGNATURE_KEY ?? 'stokku-receipt-integrity-v1'
+}
+
+export function generateReceiptSignature(payload: {
+  invoiceNumber: string
+  totalAmount: number
+  cashierUserId: number
+  createdAt: string
+}): string {
+  const rawPayload = [
+    payload.invoiceNumber,
+    payload.totalAmount.toString(),
+    payload.cashierUserId.toString(),
+    payload.createdAt,
+  ].join('|')
+
+  const signature = createHmac('sha256', getReceiptSignatureKey())
+    .update(rawPayload, 'utf8')
+    .digest('hex')
+    .slice(0, 16)
+    .toUpperCase()
+
+  return `SIG-${signature.slice(0, 4)}-${signature.slice(4, 8)}-${signature.slice(8, 12)}-${signature.slice(12, 16)}`
+}
+
+export function verifyReceiptSignature(
+  sale: SaleDetailDTO,
+  providedSignature: string,
+): ReceiptVerificationResult {
+  const verifiedAt = new Date().toISOString()
+
+  if (!providedSignature || typeof providedSignature !== 'string') {
+    return {
+      isValid: false,
+      invoiceNumber: sale.invoiceNumber,
+      verifiedAt,
+      message: 'Format tanda tangan tidak valid.',
+    }
+  }
+
+  const expectedSignature = generateReceiptSignature({
+    invoiceNumber: sale.invoiceNumber,
+    totalAmount: sale.totalAmount,
+    cashierUserId: sale.cashierUserId,
+    createdAt: sale.createdAt,
+  })
+
+  // Constant-time comparison untuk mencegah timing attack
+  const expected = Buffer.from(expectedSignature, 'utf8')
+  const provided = Buffer.from(providedSignature.trim(), 'utf8')
+
+  const isValid =
+    expected.length === provided.length && timingSafeEqual(expected, provided)
+
+  return {
+    isValid,
+    invoiceNumber: sale.invoiceNumber,
+    verifiedAt,
+    message: isValid
+      ? `Struk ${sale.invoiceNumber} terverifikasi asli (HMAC-SHA256).`
+      : `Tanda tangan tidak cocok. Struk ${sale.invoiceNumber} tidak dapat diverifikasi keasliannya.`,
+  }
+}
+
+//Multi-Item Stock Deficiency Diagnostic Matrix
+export function diagnoseStockDeficiencies(
+  items: ReadonlyArray<{ productId: number; qty: number }>,
+  productsMap: ReadonlyMap<
+    number,
+    { id: number; sku: string; name: string; unit: string; stockQty: number }
+  >,
+): readonly StockDeficiencyItem[] {
+  const deficiencies: StockDeficiencyItem[] = []
+
+  for (const item of items) {
+    const product = productsMap.get(item.productId)
+    if (!product) continue
+    if (product.stockQty < item.qty) {
+      deficiencies.push({
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        unit: product.unit,
+        requestedQty: item.qty,
+        availableQty: product.stockQty,
+        deficitQty: item.qty - product.stockQty,
+      })
+    }
+  }
+
+  return deficiencies
+}
 
 export interface PosServiceDeps {
   readonly db: DatabaseSync
@@ -69,6 +211,35 @@ export class PosService implements PosServiceContract {
     return runInImmediateTransaction(this.deps.db, () => {
       const productsMap = this.deps.productRepo.findByIds(sortedProductIds)
 
+      //Batch Stock Deficiency Diagnostic
+      // pemeriksaan produk tidak ditemukan / non-aktif (fail-fast sah di sini)
+      for (const productId of sortedProductIds) {
+        const product = productsMap.get(productId)
+        if (!product) {
+          throw AppError.notFound(`Produk dengan ID #${productId} tidak ditemukan.`)
+        }
+        if (!product.isActive) {
+          throw AppError.badRequest(
+            `Produk "${product.name}" (${product.sku}) sedang diarsipkan dan tidak dapat dijual.`,
+          )
+        }
+      }
+
+      const aggregatedItems = sortedProductIds.map((id) => ({
+        productId: id,
+        qty: qtyByProductId.get(id) ?? 0,
+      }))
+      const deficiencies = diagnoseStockDeficiencies(aggregatedItems, productsMap)
+      if (deficiencies.length > 0) {
+        const deficiencyDetails = deficiencies.map(
+          (d) =>
+            `"${d.name}" (${d.sku}): diminta ${d.requestedQty} ${d.unit}, tersedia ${d.availableQty} ${d.unit} (kurang ${d.deficitQty})`,
+        )
+        throw AppError.insufficientStock(
+          `Stok tidak mencukupi untuk ${deficiencies.length} produk:\n${deficiencyDetails.join('\n')}`,
+        )
+      }
+
       let subtotalAmount = 0
       const resolvedItems: Array<{
         productId: number
@@ -85,17 +256,10 @@ export class PosService implements PosServiceContract {
         const qty = qtyByProductId.get(productId) ?? 0
         const product = productsMap.get(productId)
 
+        // Stok sudah divalidasi batch di atas; asersi tipe aman di sini
         if (!product) {
-          throw AppError.notFound(`Produk dengan ID #${productId} tidak ditemukan.`)
-        }
-        if (!product.isActive) {
-          throw AppError.badRequest(
-            `Produk "${product.name}" (${product.sku}) sedang diarsipkan dan tidak dapat dijual.`,
-          )
-        }
-        if (product.stockQty < qty) {
-          throw AppError.insufficientStock(
-            `Stok "${product.name}" (${product.sku}) tidak mencukupi. Tersedia ${product.stockQty} ${product.unit}, diminta ${qty} ${product.unit}.`,
+          throw new Error(
+            `Invariant violation: product #${productId} missing after diagnostic.`,
           )
         }
 
@@ -156,7 +320,12 @@ export class PosService implements PosServiceContract {
         )
       }
 
-      const totalAmount = subtotalAmount - totalDiscount
+      const baseTotal = subtotalAmount - totalDiscount
+
+      // Pembulatan kas tunai (CASH) ke pecahan Rp 500 terdekat
+      const rounding = calculateCashRounding(baseTotal, input.paymentMethod)
+      const totalAmount = rounding.roundedAmount
+
       if (input.paidAmount < totalAmount) {
         throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
           {
@@ -176,7 +345,7 @@ export class PosService implements PosServiceContract {
       const changeAmount = input.paidAmount - totalAmount
       const invoiceNumber = this.deps.saleRepo.generateNextInvoiceNumber(now)
 
-      // Calculate earned points from net total amount
+      // Calculate earned points from net total amount (setelah pembulatan)
       const pointsEarned = customerId
         ? Math.floor(totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
         : 0
@@ -259,6 +428,16 @@ export class PosService implements PosServiceContract {
       if (!detail) {
         throw new Error('Failed to load newly created sale receipt.')
       }
+
+      // Tanda tangan dibuat setelah data tersimpan di DB agar payload konsisten.
+      const receiptSignature = generateReceiptSignature({
+        invoiceNumber: detail.invoiceNumber,
+        totalAmount: detail.totalAmount,
+        cashierUserId: detail.cashierUserId,
+        createdAt: detail.createdAt,
+      })
+      console.info(`[Receipt Signature] ${detail.invoiceNumber} → ${receiptSignature}`)
+
       return detail
     })
   }
@@ -308,6 +487,12 @@ export class PosService implements PosServiceContract {
         throw AppError.conflict(
           `Transaksi ${existing.invoiceNumber} sudah pernah dibatalkan sebelumnya.`,
         )
+      }
+
+      // Mencegah pembatalan nota pada shift yang sudah CLOSED dan direkonsiliasi.
+      if (existing.shiftId !== null) {
+        const originalShift = this.deps.shiftRepo.findById(existing.shiftId)
+        assertSaleCanBeVoided(existing, originalShift ?? null)
       }
 
       const marked = this.deps.saleRepo.markSaleVoided({
@@ -411,5 +596,14 @@ export class PosService implements PosServiceContract {
 
       return updated
     })
+  }
+
+  public verifyReceipt(
+    actor: UserDTO,
+    saleId: number,
+    signature: string,
+  ): ReceiptVerificationResult {
+    const sale = this.getSaleDetail(actor, saleId)
+    return verifyReceiptSignature(sale, signature)
   }
 }
