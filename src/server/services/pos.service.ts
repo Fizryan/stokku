@@ -4,6 +4,7 @@ import {
   hasPermission,
   LOYALTY_RULES,
   type PaymentMethod,
+  TAX_RATE,
 } from '../../shared/constants.js'
 import type {
   CheckoutSaleInput,
@@ -346,8 +347,11 @@ export class PosService implements PosServiceContract {
     paymentMethod: PaymentMethod,
   ): {
     totalDiscount: number
+    taxAmount: number
     totalAmount: number
     changeAmount: number
+    /** Pre-tax base (subtotal minus all discounts) — loyalty points are earned on this. */
+    preTaxAmount: number
   } {
     const totalDiscount = discountAmount + pointsDiscountAmount
     if (totalDiscount > subtotalAmount) {
@@ -357,9 +361,10 @@ export class PosService implements PosServiceContract {
       )
     }
 
-    const baseTotal = subtotalAmount - totalDiscount
-    const rounding = calculateCashRounding(baseTotal, paymentMethod)
-    const totalAmount = rounding.roundedAmount
+    const taxAmount = Math.round((subtotalAmount - totalDiscount) * TAX_RATE)
+    // Exact totals: totalAmount must equal (subtotal - discounts) + tax exactly
+    // (migration 007 CHECK constraint). Cash rounding is NOT applied at checkout.
+    const totalAmount = subtotalAmount - totalDiscount + taxAmount
 
     if (paidAmount < totalAmount) {
       throw AppError.validation('Nominal pembayaran kurang dari total tagihan.', [
@@ -379,8 +384,10 @@ export class PosService implements PosServiceContract {
 
     return {
       totalDiscount,
+      taxAmount,
       totalAmount,
       changeAmount: paidAmount - totalAmount,
+      preTaxAmount: subtotalAmount - totalDiscount,
     }
   }
 
@@ -502,8 +509,10 @@ export class PosService implements PosServiceContract {
       )
 
       const invoiceNumber = this.deps.saleRepo.generateNextInvoiceNumber(now)
+      // Points are earned on the pre-tax amount (subtotal minus all discounts),
+      // not the tax-inclusive total.
       const pointsEarned = loyalty.customerId
-        ? Math.floor(payment.totalAmount / LOYALTY_RULES.SPEND_PER_POINT)
+        ? Math.floor(payment.preTaxAmount / LOYALTY_RULES.SPEND_PER_POINT)
         : 0
 
       const saleId = this.deps.saleRepo.createSaleRecord({
@@ -517,6 +526,7 @@ export class PosService implements PosServiceContract {
         pointsDiscountAmount: loyalty.pointsDiscountAmount,
         subtotalAmount,
         discountAmount: payment.totalDiscount,
+        taxAmount: payment.taxAmount,
         totalAmount: payment.totalAmount,
         paymentMethod: input.paymentMethod,
         paidAmount: input.paidAmount,

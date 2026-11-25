@@ -30,6 +30,7 @@ interface RawSaleSummaryRow {
   points_discount_amount: number
   subtotal_amount: number
   discount_amount: number
+  tax_amount: number
   total_amount: number
   payment_method: PaymentMethod
   paid_amount: number
@@ -97,6 +98,7 @@ function mapSummaryRow(
     totalQty: row.total_qty,
     subtotalAmount: row.subtotal_amount,
     discountAmount: row.discount_amount,
+    taxAmount: row.tax_amount,
     totalAmount: row.total_amount,
     grossProfitAmount: includeFinancials ? grossProfit : null,
     paymentMethod: row.payment_method,
@@ -155,6 +157,7 @@ export class SaleRepository {
         points_discount_amount,
         subtotal_amount,
         discount_amount,
+        tax_amount,
         total_amount,
         payment_method,
         paid_amount,
@@ -162,7 +165,7 @@ export class SaleRepository {
         status,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
     `)
     this.stmtInsertSaleItem = db.prepare(`
       INSERT INTO sale_items (
@@ -192,6 +195,7 @@ export class SaleRepository {
         s.points_discount_amount,
         s.subtotal_amount,
         s.discount_amount,
+        s.tax_amount,
         s.total_amount,
         s.payment_method,
         s.paid_amount,
@@ -280,6 +284,7 @@ export class SaleRepository {
     pointsDiscountAmount?: number
     subtotalAmount: number
     discountAmount: number
+    taxAmount: number
     totalAmount: number
     paymentMethod: PaymentMethod
     paidAmount: number
@@ -307,6 +312,7 @@ export class SaleRepository {
       params.pointsDiscountAmount ?? 0,
       params.subtotalAmount,
       params.discountAmount,
+      params.taxAmount,
       params.totalAmount,
       params.paymentMethod,
       params.paidAmount,

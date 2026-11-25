@@ -134,14 +134,14 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert(openShiftRes.body.ok)
 
     // 8. First checkout with customer: 2 packs @ 50.000 = 100.000
-    // Spend = Rp 100.000 -> Should earn 10 points (1 point per Rp 10.000)
+    // Pre-tax base = Rp 100.000 (subtotal, tanpa diskon) -> Should earn 10 points
     const sale1Res = await cashierClient.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',
       json: {
         items: [{ productId: product.id, qty: 2 }],
         discountAmount: 0,
         paymentMethod: 'CASH',
-        paidAmount: 100_000,
+        paidAmount: 111_000,
         customerId: customer.id,
         pointsRedeemed: 0,
       },
@@ -149,7 +149,8 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert.equal(sale1Res.status, 201)
     assert(sale1Res.body.ok)
     assert.equal(sale1Res.body.data.subtotalAmount, 100_000)
-    assert.equal(sale1Res.body.data.totalAmount, 100_000)
+    assert.equal(sale1Res.body.data.taxAmount, 11_000)
+    assert.equal(sale1Res.body.data.totalAmount, 111_000)
     assert.equal(sale1Res.body.data.pointsEarned, 10)
     assert.equal(sale1Res.body.data.pointsRedeemed, 0)
     assert.equal(sale1Res.body.data.pointsDiscountAmount, 0)
@@ -161,7 +162,7 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert.equal(custAfterSale1.status, 200)
     assert(custAfterSale1.body.ok)
     assert.equal(custAfterSale1.body.data.pointsBalance, 10)
-    assert.equal(custAfterSale1.body.data.totalSpend, 100_000)
+    assert.equal(custAfterSale1.body.data.totalSpend, 111_000)
     assert.equal(custAfterSale1.body.data.visitCount, 1)
 
     // 9. Validation: Trying to redeem 20 points when only having 10 points must fail
@@ -180,15 +181,15 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert(!overRedeemRes.body.ok)
 
     // 10. Second checkout: 1 pack @ 50.000, redeem 5 points (Rp 500 discount)
-    // Net total = 50.000 - 500 = 49.500
-    // Points earned from 49.500 = Math.floor(49.500 / 10.000) = 4 points
+    // Pre-tax base = 50.000 - 500 = 49.500, Pajak 11% = 5.445, Total = 54.945
+    // Points earned from pre-tax base = Math.floor(49.500 / 10.000) = 4 points
     const sale2Res = await cashierClient.requestJson<SaleDetailDTO>('/api/sales', {
       method: 'POST',
       json: {
         items: [{ productId: product.id, qty: 1 }],
         discountAmount: 0,
         paymentMethod: 'CASH',
-        paidAmount: 50_000,
+        paidAmount: 60_000,
         customerId: customer.id,
         pointsRedeemed: 5,
       },
@@ -199,19 +200,20 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert.equal(sale2.subtotalAmount, 50_000)
     assert.equal(sale2.discountAmount, 500)
     assert.equal(sale2.pointsDiscountAmount, 500)
-    assert.equal(sale2.totalAmount, 49_500)
+    assert.equal(sale2.taxAmount, 5_445)
+    assert.equal(sale2.totalAmount, 54_945)
     assert.equal(sale2.pointsRedeemed, 5)
     assert.equal(sale2.pointsEarned, 4)
-    assert.equal(sale2.changeAmount, 500)
+    assert.equal(sale2.changeAmount, 5_055)
 
-    // Customer balance: 10 - 5 + 4 = 9 points; spend = 100.000 + 49.500 = 149.500; visits = 2
+    // Customer balance: 10 - 5 + 4 = 9 points; spend = 111.000 + 54.945 = 165.945; visits = 2
     const custAfterSale2 = await cashierClient.requestJson<CustomerDTO>(
       `/api/customers/${customer.id}`,
     )
     assert.equal(custAfterSale2.status, 200)
     assert(custAfterSale2.body.ok)
     assert.equal(custAfterSale2.body.data.pointsBalance, 9)
-    assert.equal(custAfterSale2.body.data.totalSpend, 149_500)
+    assert.equal(custAfterSale2.body.data.totalSpend, 165_945)
     assert.equal(custAfterSale2.body.data.visitCount, 2)
 
     // Check points mutation history
@@ -225,8 +227,8 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
 
     // 11. Void Sale 2 by Owner
     // Must restore 5 redeemed points and retract 4 earned points
-    // Net balance should return to 9 - 4 + 5 = 10 points
-    // Total spend should return to 149.500 - 49.500 = 100.000
+    // Net balance should return to 10 - 5 + 5 - 4 = 10 points
+    // Total spend should return to 165.945 - 54.945 = 111.000
     // Visit count should return to 1
     const voidRes = await ownerClient.requestJson<SaleDetailDTO>(
       `/api/sales/${sale2.id}/void`,
@@ -245,7 +247,7 @@ describe('Customer & Loyalty Points Engine (Loyalty Rewards & Ledger Invariants)
     assert.equal(custAfterVoid.status, 200)
     assert(custAfterVoid.body.ok)
     assert.equal(custAfterVoid.body.data.pointsBalance, 10)
-    assert.equal(custAfterVoid.body.data.totalSpend, 100_000)
+    assert.equal(custAfterVoid.body.data.totalSpend, 111_000)
     assert.equal(custAfterVoid.body.data.visitCount, 1)
 
     // 12. Manual Points Adjustment by Owner (+25 bonus points)

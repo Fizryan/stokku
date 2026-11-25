@@ -101,6 +101,9 @@ export const LOYALTY_RULES = {
   POINT_VALUE_IN_RUPIAH: 100,
 } as const
 
+// TODO: Move to a configurable settings page later.
+export const TAX_RATE = 0.11
+
 export const AUDIT_ACTION_TYPES = [
   'USER_ROLE_CHANGED',
   'USER_DEACTIVATED',

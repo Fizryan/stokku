@@ -35,6 +35,9 @@ export function CheckoutModal(props: CheckoutModalProps) {
     discountAmount,
     selectedCustomer,
     pointsRedeemed,
+    subtotalAmount,
+    effectiveDiscountAmount,
+    taxAmount,
     grandTotalAmount,
     paymentMethod,
     customerName,
@@ -120,13 +123,31 @@ export function CheckoutModal(props: CheckoutModalProps) {
           </div>
         )}
 
-        <div class="rounded-2xl bg-m3-primary-container/60 px-4 py-3.5 flex items-center justify-between">
-          <span class="text-xs font-semibold text-m3-on-primary-container">
-            Total Harus Dibayar
-          </span>
-          <span class="text-xl font-bold text-m3-primary tabular-nums">
-            {formatRupiah(grandTotalAmount)}
-          </span>
+        <div class="rounded-2xl bg-m3-primary-container/60 px-4 py-3.5 flex flex-col gap-2">
+          <div class="flex flex-col gap-1 text-xs tabular-nums">
+            <div class="flex justify-between text-m3-on-surface-variant">
+              <span>Subtotal</span>
+              <span>{formatRupiah(subtotalAmount)}</span>
+            </div>
+            {effectiveDiscountAmount > 0 && (
+              <div class="flex justify-between text-m3-on-surface-variant">
+                <span>Total Diskon</span>
+                <span>-{formatRupiah(effectiveDiscountAmount)}</span>
+              </div>
+            )}
+            <div class="flex justify-between text-m3-on-surface-variant">
+              <span>Pajak (11%)</span>
+              <span>{formatRupiah(taxAmount)}</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-m3-on-primary-container">
+              Total Harus Dibayar
+            </span>
+            <span class="text-xl font-bold text-m3-primary tabular-nums">
+              {formatRupiah(grandTotalAmount)}
+            </span>
+          </div>
         </div>
 
         <div class="flex flex-col gap-1.5">
